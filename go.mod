@@ -1,4 +1,4 @@
-module goframe
+module github.com/dxq174510447/goframe
 
 go 1.16
 
