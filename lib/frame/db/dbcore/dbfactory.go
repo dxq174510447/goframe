@@ -18,17 +18,18 @@ func AddDatabaseRouter(key string, db *sql.DB) {
 }
 
 type DatabaseFactory struct {
-	dbUser string
-	dbPwd  string
-	dbName string
-	dbPort string
-	dbHost string
+	DbUser string
+	DbPwd  string
+	DbName string
+	DbPort string
+	DbHost string
+	Prop   map[string]string
 }
 
 func (c *DatabaseFactory) NewDatabase() *sql.DB {
 	//user:password@tcp(localhost:5555)/dbname?characterEncoding=UTF-8
 	url := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=true&loc=Local",
-		c.dbUser, c.dbPwd, c.dbHost, c.dbPort, c.dbName,
+		c.DbUser, c.DbPwd, c.DbHost, c.DbPort, c.DbName,
 	)
 	fmt.Println(url)
 	db, _ := sql.Open("mysql", url)
