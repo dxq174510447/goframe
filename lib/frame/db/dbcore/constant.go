@@ -2,7 +2,7 @@ package dbcore
 
 import (
 	"database/sql"
-	"goframe/lib/frame/context"
+	"github.com/dxq174510447/goframe/lib/frame/context"
 	"reflect"
 	"time"
 )

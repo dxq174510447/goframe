@@ -2,7 +2,7 @@ package http
 
 import (
 	"fmt"
-	"goframe/lib/frame/proxy"
+	"github.com/dxq174510447/goframe/lib/frame/proxy"
 	"sort"
 	"strings"
 )
