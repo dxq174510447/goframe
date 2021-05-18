@@ -1,9 +1,9 @@
 package frame
 
 import (
-	_ "goframe/lib/frame/db"
-	_ "goframe/lib/frame/http"
-	_ "goframe/lib/frame/proxy"
+	_ "github.com/dxq174510447/goframe/lib/frame/db"
+	_ "github.com/dxq174510447/goframe/lib/frame/http"
+	_ "github.com/dxq174510447/goframe/lib/frame/proxy"
 )
 
 func init() {

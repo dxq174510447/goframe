@@ -1,6 +1,6 @@
 package util
 
-import "goframe/lib/frame/vo"
+import "github.com/dxq174510447/goframe/lib/frame/vo"
 
 type jsonUtil struct {
 }
