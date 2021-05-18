@@ -15,6 +15,13 @@ import (
 	"strings"
 )
 
+var DefaultServletPath = ""
+
+func SetDefaultServletPath(servletPath string) string {
+	DefaultServletPath = servletPath
+	return servletPath
+}
+
 type RestAnnotationSetting struct {
 
 	//对应path路径 以/开头
@@ -45,15 +52,6 @@ type ControllerVar struct {
 }
 
 type DispatchServlet struct {
-	ContextPath string
-}
-
-func (d *DispatchServlet) SetContextPath(contextPath string) {
-	d.ContextPath = contextPath
-}
-
-func (d *DispatchServlet) GetContextPath() string {
-	return d.ContextPath
 }
 
 func (d *DispatchServlet) Dispatch(local *context.LocalStack, request *http.Request, response http.ResponseWriter) {

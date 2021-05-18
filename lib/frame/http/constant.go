@@ -107,7 +107,7 @@ func PrintStackTrace(err interface{}) string {
 
 func GetControllerPathPrefix(dispatchServlet *DispatchServlet, target proxy.ProxyTarger) string {
 	//context-path
-	var sp string = dispatchServlet.ContextPath
+	var sp string = DefaultServletPath
 	if sp == "/" {
 		sp = ""
 	}
