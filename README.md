@@ -7,7 +7,7 @@
 2. 所有的controller,service,dao都是单例    
 3. 所有的aop都是基于类字段类型是func来动态包裹一层来实现的，所以调用类的方法，在通过类的方法中去调用类的字段，然后字段在初始化的时候去设置它的实现    
 4. 在类调用中最好不要直接使用字段，方法和字段命令规则，字段在方法的后面加上"_"即可，例如方法  
-``go
+```
    type UsersController struct {
        Save_         func(local *context.LocalStack, param *vo.UsersAdd, self *UsersController) *vo.UsersVo
    }
@@ -15,7 +15,7 @@
        result := c.Save_(local, param, c)
        return util.JsonUtil.BuildJsonSuccess(result)
    }
-``
+```
    
 5. 所有方法第一个参数必须是*context.LocalStack，类似java中的threadlocal类型
    
