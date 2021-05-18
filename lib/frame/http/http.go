@@ -2,12 +2,12 @@ package http
 
 import (
 	"encoding/json"
-	"firstgo/frame/context"
-	"firstgo/frame/exception"
-	"firstgo/frame/proxy"
-	"firstgo/frame/vo"
-	"firstgo/util"
 	"fmt"
+	"goframe/lib/frame/context"
+	"goframe/lib/frame/exception"
+	"goframe/lib/frame/proxy"
+	"goframe/lib/frame/util"
+	"goframe/lib/frame/vo"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -48,6 +48,14 @@ type DispatchServlet struct {
 	ContextPath string
 }
 
+func (d *DispatchServlet) SetContextPath(contextPath string) {
+	d.ContextPath = contextPath
+}
+
+func (d *DispatchServlet) GetContextPath() string {
+	return d.ContextPath
+}
+
 func (d *DispatchServlet) Dispatch(local *context.LocalStack, request *http.Request, response http.ResponseWriter) {
 	controller := GetCurrentControllerInvoker(local)
 
@@ -66,8 +74,8 @@ func (d *DispatchServlet) Dispatch(local *context.LocalStack, request *http.Requ
 	}()
 
 	// 去除?之后的
-	url := util.ConfigUtil.ClearHttpPath(request.URL.Path)
-	url = util.ConfigUtil.RemovePrefix(url, controller.PrefixPath)
+	url := clearHttpPath(request.URL.Path)
+	url = removePrefix(url, controller.PrefixPath)
 
 	httpMethod := strings.ToLower(request.Method)
 	mk := fmt.Sprintf("%s-%s", httpMethod, url)
@@ -191,9 +199,7 @@ func (d *DispatchServlet) renderExceptionJson(response http.ResponseWriter, requ
 	response.Write(a)
 }
 
-var dispatchServlet DispatchServlet = DispatchServlet{
-	ContextPath: util.ConfigUtil.Get("contextPath", "/api"),
-}
+var dispatchServlet DispatchServlet = DispatchServlet{}
 
 func GetDispatchServlet() *DispatchServlet {
 	return &dispatchServlet
@@ -289,4 +295,28 @@ func getParameterValueFromRequest(request *http.Request, methodPosition int,
 		}
 	}
 	return ""
+}
+
+func clearHttpPath(path string) string {
+	return path
+}
+
+func removePrefix(path string, prefix string) string {
+
+	//	fmt.Println(path,prefix)
+	if path == prefix {
+		return ""
+	}
+
+	if strings.HasPrefix(path, prefix) {
+		r := path[len(prefix):]
+		if r == "/" {
+			return ""
+		}
+		if r[0:1] != "/" {
+			return fmt.Sprintf("/%s", r)
+		}
+		return r
+	}
+	return path
 }

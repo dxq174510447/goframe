@@ -1,8 +1,8 @@
 package dbcore
 
 import (
-	"firstgo/frame/context"
-	"firstgo/frame/proxy"
+	"goframe/lib/frame/context"
+	"goframe/lib/frame/proxy"
 	"reflect"
 )
 

@@ -1,8 +1,8 @@
 package http
 
 import (
-	"firstgo/frame/proxy"
 	"fmt"
+	"goframe/lib/frame/proxy"
 	"sort"
 	"strings"
 )

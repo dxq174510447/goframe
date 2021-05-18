@@ -2,9 +2,9 @@ package http
 
 import (
 	"bytes"
-	"firstgo/frame/context"
-	"firstgo/frame/proxy"
 	"fmt"
+	"goframe/lib/frame/context"
+	"goframe/lib/frame/proxy"
 	"net/http"
 	"runtime"
 )

@@ -1,6 +1,6 @@
 package dbcore
 
-import "firstgo/frame/exception"
+import "goframe/lib/frame/exception"
 
 type DaoException struct {
 	exception.FrameException

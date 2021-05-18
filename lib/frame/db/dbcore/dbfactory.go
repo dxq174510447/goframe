@@ -3,7 +3,6 @@ package dbcore
 import (
 	"context"
 	"database/sql"
-	"firstgo/util"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"reflect"
@@ -139,14 +138,14 @@ func OpenSqlConnection(readOnly int) *DatabaseConnection {
 func init() {
 
 	// 初始化默认数据源
-	var defaultFactory DatabaseFactory = DatabaseFactory{
-		dbUser: util.ConfigUtil.Get("DB_USER", "platform"),
-		dbPwd:  util.ConfigUtil.Get("DB_PASSWORD", "xxcxcx"),
-		dbName: util.ConfigUtil.Get("DB_NAME", "plat_base1"),
-		dbPort: util.ConfigUtil.Get("DB_PORT", "3306"),
-		dbHost: util.ConfigUtil.Get("DB_HOST", "rm-bp1thh63s5tx33q0kio.mysql.rds.aliyuncs.com"),
-	}
-	db := defaultFactory.NewDatabase()
-	AddDatabaseRouter(DataBaseDefaultKey, db)
+	//var defaultFactory DatabaseFactory = DatabaseFactory{
+	//	dbUser: util.ConfigUtil.Get("DB_USER", "platform"),
+	//	dbPwd:  util.ConfigUtil.Get("DB_PASSWORD", "xxcxcx"),
+	//	dbName: util.ConfigUtil.Get("DB_NAME", "plat_base1"),
+	//	dbPort: util.ConfigUtil.Get("DB_PORT", "3306"),
+	//	dbHost: util.ConfigUtil.Get("DB_HOST", "rm-bp1thh63s5tx33q0kio.mysql.rds.aliyuncs.com"),
+	//}
+	//db := defaultFactory.NewDatabase()
+	//AddDatabaseRouter(DataBaseDefaultKey, db)
 
 }
