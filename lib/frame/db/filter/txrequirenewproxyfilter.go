@@ -2,9 +2,9 @@ package filter
 
 import (
 	"fmt"
-	"github.com/dxq174510447/goframe/lib/frame/context"
-	"github.com/dxq174510447/goframe/lib/frame/db/dbcore"
-	"github.com/dxq174510447/goframe/lib/frame/proxy"
+	"goframe/lib/frame/context"
+	"goframe/lib/frame/db/dbcore"
+	"goframe/lib/frame/proxy"
 	"reflect"
 )
 

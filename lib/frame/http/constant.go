@@ -3,8 +3,8 @@ package http
 import (
 	"bytes"
 	"fmt"
-	"github.com/dxq174510447/goframe/lib/frame/context"
-	"github.com/dxq174510447/goframe/lib/frame/proxy"
+	"goframe/lib/frame/context"
+	"goframe/lib/frame/proxy"
 	"net/http"
 	"runtime"
 )
