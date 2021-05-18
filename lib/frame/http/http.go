@@ -17,11 +17,6 @@ import (
 
 var DefaultServletPath = ""
 
-func SetDefaultServletPath(servletPath string) string {
-	DefaultServletPath = servletPath
-	return servletPath
-}
-
 type RestAnnotationSetting struct {
 
 	//对应path路径 以/开头
