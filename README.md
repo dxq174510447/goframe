@@ -124,3 +124,11 @@ type ProxyTarger interface {
 见 TxRequireNewProxyFilter
 
 ### 在持续优化中
+
+### 20210520-20210528 v1.1
+#### bug
+1. 保存的时候如果是递增，把id设置到对应到字段上
+
+
+#### 优化项
+1. 由于init执行顺序问题，改成代理加载分两步，init中先把实例放到容器中，启动到时候去加载这些类实例实现aop
