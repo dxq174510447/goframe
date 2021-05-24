@@ -15,6 +15,12 @@ import (
 	"time"
 )
 
+type DaoProxyTarger interface {
+	proxy.ProxyTarger
+	DaoXml() string
+	DaoEntity() interface{}
+}
+
 type SqlProviderConfig struct {
 	Param string
 }
@@ -557,9 +563,9 @@ func (s *sqlInvoke) invokeInsert(local *context.LocalStack, args []reflect.Value
 	}
 
 	if s.baseMethod && s.tableDef != nil && s.tableDef.IdColumn != nil &&
-		strings.ToUpper(s.tableDef.GenerationType)=="IDENTITY" {
+		strings.ToUpper(s.tableDef.GenerationType) == "IDENTITY" {
 		// 这种情况 args[1] 就是entity
-		lid1 ,err2 := sqlResult.LastInsertId()
+		lid1, err2 := sqlResult.LastInsertId()
 
 		if err2 != nil {
 			if errorFlag == 0 {
@@ -576,12 +582,12 @@ func (s *sqlInvoke) invokeInsert(local *context.LocalStack, args []reflect.Value
 		var llid1 interface{}
 		switch s.tableDef.IdColumn.Field.Type.Kind() {
 		case reflect.Int:
-			llid1 = &sql.NullInt32{Int32: int32(lid1),Valid: true}
+			llid1 = &sql.NullInt32{Int32: int32(lid1), Valid: true}
 		case reflect.Int64:
-			llid1 = &sql.NullInt64{Int64: lid1,Valid: true}
+			llid1 = &sql.NullInt64{Int64: lid1, Valid: true}
 		}
 		enptr := args[1].Elem().Elem()
-		SetEntityFieldValue(&enptr,s.tableDef.IdColumn.Field,llid1)
+		SetEntityFieldValue(&enptr, s.tableDef.IdColumn.Field, llid1)
 	}
 
 	if s.returnSqlType != nil {
@@ -886,24 +892,25 @@ func newSqlInvoke(
 		defaultReturnValue:   defaultReturnValue,
 		structFieldMap:       structFieldMap,
 		returnSqlElementType: returnSqlElementType,
-		baseXmlEle: baseXmlEle,
-		tableDef: tableDef,
-		baseMethod: baseMethod,
+		baseXmlEle:           baseXmlEle,
+		tableDef:             tableDef,
+		baseMethod:           baseMethod,
 	}
 }
 
-func AddMapperProxyTarget(target1 proxy.ProxyTarger, xml string, entity interface{}) {
+func AddMapperProxyTarget(target1 DaoProxyTarger) {
 
 	//解析字段方法 包裹一层
 	rv := reflect.ValueOf(target1)
 	rt := rv.Elem().Type()
 
-	xmlele := mapperFactory.ParseXml(target1, xml)
+	xmlele := mapperFactory.ParseXml(target1, target1.DaoXml())
 	var baseXmlEle map[string]*MapperElementXml
 
 	var tableDef *TableDef
+	dapEntity := target1.DaoEntity()
 	if BaseXml != "" {
-		tableDef = parseEntityType(entity)
+		tableDef = parseEntityType(dapEntity)
 		buf := &bytes.Buffer{}
 		err1 := BaseXmlTpl.Execute(buf, tableDef)
 		if err1 != nil {
@@ -928,15 +935,15 @@ func AddMapperProxyTarget(target1 proxy.ProxyTarger, xml string, entity interfac
 						basefield := field.Type.Field(j)
 						target := rv.Elem().FieldByName(field.Name)
 						addCallerToField(target1, &target, &basefield, methodRef,
-							baseXmlEle, entity, true,
-							baseXmlEle,tableDef)
+							baseXmlEle, dapEntity, true,
+							baseXmlEle, tableDef)
 					}
 				}
 			} else if field.Type.Kind() == reflect.Func && rv.Elem().FieldByName(field.Name).IsNil() {
 				target := rv.Elem()
 				addCallerToField(target1, &target, &field, methodRef,
-					xmlele, entity, false,
-					baseXmlEle,tableDef)
+					xmlele, dapEntity, false,
+					baseXmlEle, tableDef)
 			}
 		}
 	}
