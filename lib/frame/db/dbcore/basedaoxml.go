@@ -10,7 +10,7 @@ const BaseXml = `
 <mapper>
 	<insert id="Save">
 			insert into {{.Name}}(
-			{{range $index, $ele := $.Columns}}{{if $index}},{{end}}{{$ele.ColumnName}}{{end}}
+			{{range $index, $ele := $.Columns}}{{if $index}},{{end}}{{printf "%c" 96}}{{$ele.ColumnName}}{{printf "%c" 96}}{{end}}
 			) values (
 			{{range $index, $ele := $.Columns}}{{if $index}},{{end}}#{{"{"}}{{$ele.FieldName}}{{"}"}}{{end}}
 			)
@@ -19,22 +19,22 @@ const BaseXml = `
 	<update id="Update">
 		update {{.Name}} 
 		set
-		{{range $index, $ele := $.Columns}}{{if $ele.Updatable}}{{if $index}},{{end}}{{$ele.ColumnName}} = #{{"{"}}{{$ele.FieldName}}{{"}"}}{{end}}{{end}}
-		where {{.IdColumn.ColumnName}} = #{{"{"}}{{.IdColumn.FieldName}}{{"}"}}
+		{{range $index, $ele := $.Columns}}{{if $ele.Updatable}}{{if $index}},{{end}}{{printf "%c" 96}}{{$ele.ColumnName}}{{printf "%c" 96}} = #{{"{"}}{{$ele.FieldName}}{{"}"}}{{end}}{{end}}
+		where {{printf "%c" 96}}{{.IdColumn.ColumnName}}{{printf "%c" 96}} = #{{"{"}}{{.IdColumn.FieldName}}{{"}"}}
 	</update>
 
 	<delete id="Delete">
-		delete from {{.Name}} where {{.IdColumn.ColumnName}} = #{{"{"}}{{.IdColumn.FieldName}}{{"}"}}
+		delete from {{.Name}} where {{printf "%c" 96}}{{.IdColumn.ColumnName}}{{printf "%c" 96}} = #{{"{"}}{{.IdColumn.FieldName}}{{"}"}}
 	</delete>
 
 	<select id="Get">
-		select {{range $index, $ele := $.Columns}}{{if $index}},{{end}}{{$ele.ColumnName}}{{end}}
+		select {{range $index, $ele := $.Columns}}{{if $index}},{{end}}{{printf "%c" 96}}{{$ele.ColumnName}}{{printf "%c" 96}} {{$ele.FieldName}}{{end}}
 		from {{.Name}}
 		where {{.IdColumn.ColumnName}} = #{{"{"}}{{.IdColumn.FieldName}}{{"}"}}
 	</select>
 
 	<select id="Find">
-		select {{range $index, $ele := $.Columns}}{{if $index}},{{end}}{{$ele.ColumnName}}{{end}}
+		select {{range $index, $ele := $.Columns}}{{if $index}},{{end}}{{printf "%c" 96}}{{$ele.ColumnName}}{{printf "%c" 96}} {{$ele.FieldName}}{{end}}
 		from {{.Name}}
 		where 1=1 
 		{{range $index, $ele := $.Columns}}
