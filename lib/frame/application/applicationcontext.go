@@ -1,8 +1,9 @@
-package proxy
+package application
 
 import (
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/context"
+	"github.com/dxq174510447/goframe/lib/frame/proxy"
 	"sort"
 )
 
@@ -13,7 +14,7 @@ type FrameApplicationContext struct {
 type FrameApplication struct {
 	MainClass interface{}
 	// 容器 所有代理带对象
-	ProxyTarges []*ProxyTarger
+	ProxyTarges []*proxy.ProxyTarger
 
 	ApplicationListeners []ApplicationContextListener
 }
@@ -47,18 +48,18 @@ func (a *FrameApplication) Run(args []string) *FrameApplicationContext {
 
 	// 准备上下文环境
 	environment := a.prepareEnvironment(local, listeners, appArg)
+	fmt.Println(environment)
+	//context := a.createApplicationContext(local)
+	//
+	//a.prepareContext(local, context, environment, listeners, appArg)
+	//
+	//a.refreshContext(local, context)
+	//
+	//listeners.Started(local, context)
+	//
+	//listeners.Running(local, context)
 
-	context := a.createApplicationContext(local)
-
-	a.prepareContext(local, context, environment, listeners, appArg)
-
-	a.refreshContext(local, context)
-
-	listeners.Started(local, context)
-
-	listeners.Running(local, context)
-
-	return context
+	return nil
 }
 
 // prepareEnvironment 加载应用配置项
@@ -113,7 +114,7 @@ func (a *FrameApplication) configureEnvironment(local *context.LocalStack, envir
 
 }
 
-func ApplicationRun(main interface{}, args ...string) *FrameApplicationContext {
+func NewApplication(main interface{}, args ...string) *FrameApplication {
 	app := &FrameApplication{MainClass: main}
-	return app.Run(args)
+	return app
 }

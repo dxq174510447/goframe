@@ -1,4 +1,4 @@
-package proxy
+package application
 
 import "github.com/dxq174510447/goframe/lib/frame/context"
 
