@@ -5,6 +5,7 @@ import (
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/proxy"
 	"sort"
+	"strings"
 )
 
 type FrameApplicationContext struct {
@@ -13,32 +14,48 @@ type FrameApplicationContext struct {
 
 type FrameApplication struct {
 	MainClass interface{}
-	// 容器 所有代理带对象
-	ProxyTarges []*proxy.ProxyTarger
 
 	ApplicationListeners []ApplicationContextListener
+
+	LoadStrategy []FrameLoadInstanceHandler
+
+	Environment *ConfigurableEnvironment
+}
+
+func (a *FrameApplication) AddApplicationContextListener(listener ApplicationContextListener) *FrameApplication {
+	a.ApplicationListeners = append(a.ApplicationListeners, listener)
+	return a
 }
 
 func (a *FrameApplication) Run(args []string) *FrameApplicationContext {
 
 	local := context.NewLocalStack()
+
+	var listeners *ApplicationRunContextListeners
+	var context *FrameApplicationContext
 	defer func() {
-		defer local.Destroy()
-		//TODO 错误处理
-		fmt.Println("ada")
+		if err := recover(); err != nil {
+			listeners.Failed(local, context, err)
+			local.Destroy()
+			panic(err)
+		}
 	}()
 
+	// 启动参数
+	appArg := &DefaultApplicationArguments{
+		Args:   args,
+		ArgMap: make(map[string]string),
+	}
+	// 解析启动参数
+	appArg.Parse()
+
+	// 排序 全局启动事件回调
 	if len(a.ApplicationListeners) > 1 {
 		sort.Slice(a.ApplicationListeners, func(i, j int) bool {
 			return a.ApplicationListeners[i].Order() < a.ApplicationListeners[j].Order()
 		})
 	}
-
-	// 启动参数
-	appArg := &DefaultApplicationArguments{Args: args[1:len(args)]}
-
-	// 全局启动事件回调
-	listeners := &ApplicationRunContextListeners{
+	listeners = &ApplicationRunContextListeners{
 		ApplicationListeners: a.ApplicationListeners,
 		Args:                 appArg,
 	}
@@ -47,74 +64,138 @@ func (a *FrameApplication) Run(args []string) *FrameApplicationContext {
 	listeners.Starting(local)
 
 	// 准备上下文环境
-	environment := a.prepareEnvironment(local, listeners, appArg)
-	fmt.Println(environment)
-	//context := a.createApplicationContext(local)
-	//
-	//a.prepareContext(local, context, environment, listeners, appArg)
-	//
-	//a.refreshContext(local, context)
-	//
-	//listeners.Started(local, context)
-	//
-	//listeners.Running(local, context)
+	a.PrepareEnvironment(local, listeners, appArg)
 
-	return nil
+	context = a.CreateApplicationContext(local)
+
+	a.RefreshContext(local, context)
+
+	listeners.Running(local, context)
+
+	return context
 }
 
-// prepareEnvironment 加载应用配置项
-func (a *FrameApplication) prepareEnvironment(local *context.LocalStack,
+// PrepareEnvironment 加载应用配置项
+func (a *FrameApplication) PrepareEnvironment(local *context.LocalStack,
 	listeners *ApplicationRunContextListeners,
 	appArgs *DefaultApplicationArguments) *ConfigurableEnvironment {
 
 	c := GetEnvironmentFromApplication(local)
 	if c == nil {
-		c = &ConfigurableEnvironment{PropertySources: &MutablePropertySources{}}
+		c = &ConfigurableEnvironment{
+			ConfigTree: &YamlTree{},
+			AppArgs:    appArgs,
+		}
 		SetEnvironmentToApplication(local, c)
 	}
+	a.Environment = c
 
 	// 记载启动配置文件
-	a.configureEnvironment(local, c, appArgs)
+	a.ConfigureEnvironment(local, c, appArgs)
 
 	// 全局事件
 	listeners.EnvironmentPrepared(local, c)
 	return c
 }
 
-// TODO
-func (a *FrameApplication) createApplicationContext(local *context.LocalStack) *FrameApplicationContext {
-	return &FrameApplicationContext{}
+func (a *FrameApplication) CreateApplicationContext(local *context.LocalStack) *FrameApplicationContext {
+	applicationContext := &FrameApplicationContext{
+		Environment: a.Environment,
+	}
+	return applicationContext
 }
 
-// TODO
-func (a *FrameApplication) prepareContext(local *context.LocalStack, context *FrameApplicationContext,
+// RefreshContext 加载实例
+func (a *FrameApplication) RefreshContext(local *context.LocalStack, applicationContext *FrameApplicationContext) {
+	pl := GetResourcePool().ProxyInsList
+
+	if len(a.LoadStrategy) > 1 {
+		sort.Slice(a.LoadStrategy, func(i, j int) bool {
+			return a.LoadStrategy[i].Order() < a.LoadStrategy[j].Order()
+		})
+	}
+
+	for _, k := range pl {
+		if k == nil {
+			continue
+		}
+		var add bool = false
+
+		if len(a.LoadStrategy) > 0 {
+			for _, strategy := range a.LoadStrategy {
+				add = strategy.LoadInstance(local, k, a, applicationContext)
+				if add {
+					break
+				}
+			}
+		}
+		if !add {
+			proxy.AddClassProxy(k)
+		}
+	}
+}
+
+// ConfigureEnvironment 加载配置文件
+func (a *FrameApplication) ConfigureEnvironment(local *context.LocalStack,
 	environment *ConfigurableEnvironment,
-	listeners *ApplicationRunContextListeners,
-	arg *DefaultApplicationArguments) {
-	context.Environment = environment
+	appArgs *DefaultApplicationArguments) {
 
-	listeners.ContextPrepared(local, context)
+	// 加载系统默认配置文件
+	files := make([]string, 0, 0)
+	files = append(files, ApplicationDefaultYaml)
+	activeFile := appArgs.GetByName("spring.profiles.active", "")
+	if activeFile != "" {
+		fs := strings.Split(activeFile, ",")
+		files = append(files, fs...)
+	} else {
+		files = append(files, ApplicationLocalYaml)
+	}
 
-	a.load(local, context, a.MainClass)
+	for _, f := range files {
+		if c, ok := GetResourcePool().ConfigMap[f]; ok {
+			fmt.Printf(" 加载配置文件 %s\n", f)
+			environment.Parse(c)
+		} else {
+			fmt.Printf(" 配置文件不存在资源中 %s\n", f)
+		}
+	}
 
-	listeners.ContextLoaded(local, context)
+	// 加载引用文件
+	fileinclude := environment.GetBaseValue("spring.profiles.include", "")
+	if fileinclude != "" {
+		fs := strings.Split(fileinclude, ",")
+		for _, f := range fs {
+			if c, ok := GetResourcePool().ConfigMap[f]; ok {
+				fmt.Printf(" 加载配置文件 %s\n", f)
+				environment.Parse(c)
+			} else {
+				fmt.Printf(" 配置文件不存在资源中 %s\n", f)
+			}
+		}
+	}
+
 }
 
-func (a *FrameApplication) load(local *context.LocalStack, context *FrameApplicationContext,
-	mainClass interface{}) {
+func NewApplication(main interface{}) *FrameApplication {
 
-}
+	listeners := make([]ApplicationContextListener, 0, 0)
+	if arr, ok := GetResourcePool().RegisterInsMap[ApplicationContextListenerTypeName]; ok {
+		for _, a := range arr {
+			listeners = append(listeners, a.(ApplicationContextListener))
+		}
+	}
 
-func (a *FrameApplication) refreshContext(local *context.LocalStack, applicationContext *FrameApplicationContext) {
+	instanceLoad := make([]FrameLoadInstanceHandler, 0, 0)
+	if arr, ok := GetResourcePool().RegisterInsMap[FrameLoadInstanceHandlerTypeName]; ok {
+		for _, a := range arr {
+			instanceLoad = append(instanceLoad, a.(FrameLoadInstanceHandler))
+		}
+	}
 
-}
-
-// configureEnvironment 加载配置文件
-func (a *FrameApplication) configureEnvironment(local *context.LocalStack, environment *ConfigurableEnvironment, appArgs *DefaultApplicationArguments) {
-
-}
-
-func NewApplication(main interface{}, args ...string) *FrameApplication {
-	app := &FrameApplication{MainClass: main}
+	app := &FrameApplication{
+		MainClass:            main,
+		ApplicationListeners: listeners,
+		LoadStrategy:         instanceLoad,
+	}
 	return app
 }

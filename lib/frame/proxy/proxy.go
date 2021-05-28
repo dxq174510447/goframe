@@ -148,6 +148,9 @@ func AddClassProxy(target ProxyTarger) {
 	clazzName := GetClassName(target)
 
 	//添加到映射中
+	if clazz == nil {
+		clazz = &ProxyClass{}
+	}
 	clazz.Target = target
 	clazz.Name = clazzName
 	classProxy[clazzName] = clazz
@@ -248,6 +251,10 @@ func proxyStructFuncField(target ProxyTarger,
 //GetClassName 用来获取struct的全路径 传递指针
 func GetClassName(target interface{}) string {
 	t := reflect.ValueOf(target).Elem().Type()
+	return fmt.Sprintf("%s/%s", t.PkgPath(), t.Name())
+}
+
+func GetClassNameByType(t reflect.Type) string {
 	return fmt.Sprintf("%s/%s", t.PkgPath(), t.Name())
 }
 

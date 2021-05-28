@@ -63,9 +63,19 @@ func GetCurrentFilterIndex(local *context.LocalStack) int {
 
 func GetRequestAnnotationSetting(annotations []*proxy.AnnotationClass) *RestAnnotationSetting {
 	for _, annotation := range annotations {
-		if annotation.Name == AnnotationRestController {
-			r, _ := annotation.Value[AnnotationValueRestKey]
-			return r.(*RestAnnotationSetting)
+		if annotation.Name == AnnotationRestController || annotation.Name == AnnotationController {
+			if r, ok := annotation.Value[AnnotationValueRestKey]; ok {
+				return r.(*RestAnnotationSetting)
+			}
+			return nil
+		}
+	}
+	return nil
+}
+func GetRequestAnnotation(annotations []*proxy.AnnotationClass) *proxy.AnnotationClass {
+	for _, annotation := range annotations {
+		if annotation.Name == AnnotationRestController || annotation.Name == AnnotationController {
+			return annotation
 		}
 	}
 	return nil

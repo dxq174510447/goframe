@@ -1,6 +1,11 @@
 package application
 
-import "testing"
+import (
+	"fmt"
+	"github.com/dxq174510447/goframe/lib/frame/context"
+	"github.com/dxq174510447/goframe/lib/frame/proxy"
+	"testing"
+)
 
 type RunFirst struct {
 }
@@ -37,7 +42,99 @@ server:
     outer: "bbbbbb"
 `
 
+var platformYaml string = `
+spring:
+  tempDir: ${APPLICATION_TEMP_DIR:/data/tmp}
+  sleuth:
+    sampler:
+      probability: 100
+  zipkin:
+    sender:
+      type: kafka
+  kafka:
+    bootstrapServers: ${APPLICATION_KAFKA_URL:47.105.61.26:9092} 
+  redis:
+##    cluster:
+##      nodes: ${APPLICATION_REDIS_CLUSTER_URL:193.112.250.112:7000,193.112.250.112:7001,193.112.250.112:7002}
+    host: ${APPLICATION_REDIS_IP:47.105.61.26}
+    port: ${APPLICATION_REDIS_PORT:6379}
+    password: ${APPLICATION_REDIS_PASSWORD:gsta2012}
+    timeout: ${APPLICATION_REDIS_TIMEOUT:5000}
+  data:
+    mongodb:
+      host: ${APPLICATION_MONGODB_IP:47.105.61.26}
+      port: ${APPLICATION_MONGODB_PORT:27017}
+      database: ${APPLICATION_MONGODB_DATABASE:application}
+  cloud:
+    httptoken:
+      headerName: ${APPLICATION_CLOUD_TOKEN_KEY:token}
+      tokenPlatform: ${APPLICATION_CLOUD_TOKEN_PLATFORM:base-frontend}
+    circuit:
+      breaker:
+        enabled: true
+    zookeeper:
+      connectString: ${APPLICATION_ZOOK_URL:47.105.61.26:2181}
+      discovery:
+        preferIpAddress: true
+        root: /platform/services
+      lock: /platform/lock
+      coordination: /platform/coordination
+ali:
+  log:
+    accessKey: ${APPLICATION_ALI_LOG_KEY:LTAI4FhakQ36Yg6au6ZDPgsw}
+    accessKeySecret: ${APPLICATION_ALI_LOG_SECRET:Ieo6QuXNKRYXdQ9hgvHpwFvMxp5db3}
+    logStore: 
+      globalSeach: 
+        endpoint: null
+    properties:
+      ioThreadCount: 3
+      totalSizeInBytes: 1048576
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 10000
+        readTimeout: 20000
+        loggerLevel: FULL
+        retryer: cloud.ecosphere.yy.framework.platform.feignclient.strategy.NeverRetryer
+`
+
+type TestAppListener struct {
+}
+
+func (t *TestAppListener) Starting(local *context.LocalStack) {
+	fmt.Println("TestAppListener", "Starting")
+}
+
+func (t *TestAppListener) EnvironmentPrepared(local *context.LocalStack, environment *ConfigurableEnvironment) {
+	fmt.Println("TestAppListener", "EnvironmentPrepared")
+}
+
+func (t *TestAppListener) Running(local *context.LocalStack, application *FrameApplicationContext) {
+	fmt.Println("TestAppListener", "Running")
+}
+
+func (t *TestAppListener) Failed(local *context.LocalStack, application *FrameApplicationContext, err interface{}) {
+	fmt.Println("TestAppListener", "Failed")
+}
+
+func (t *TestAppListener) Order() int {
+	return 1
+}
+
+func (t *TestAppListener) ProxyTarget() *proxy.ProxyClass {
+	return nil
+}
+
 func TestApplicationRun(t *testing.T) {
-	AddConfigYaml("application.yml", yaml)
-	AddConfigYaml("application-platform.yml", yamlDev)
+	AddConfigYaml(ApplicationDefaultYaml, yaml)
+	AddConfigYaml(ApplicationLocalYaml, yamlDev)
+	AddConfigYaml("platform", platformYaml)
+	AddProxyInstance("", &TestAppListener{})
+
+	args := []string{}
+	app := NewApplication(&RunFirst{})
+	app.Run(args)
+	fmt.Println(app.Environment.GetBaseValue("ali.log.accessKey", ""))
+	//fmt.Println(get)
 }
