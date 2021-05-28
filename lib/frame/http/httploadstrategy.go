@@ -51,7 +51,6 @@ func (h *HttpFilterLoadStrategy) LoadInstance(local *context.LocalStack, target 
 		return false
 	}
 	if f, ok := target.(Filter); ok {
-		proxy.AddClassProxy(target)
 		AddFilter(f)
 		return true
 	}

@@ -32,21 +32,17 @@ func (m *methodInvoke) initFilter() {
 	}
 
 	fmt.Println("初始化")
-	executor := defaultProxyFilterFactory.GetInstance(nil)
 
 	var fs []ProxyFilter
-	var hasCreate map[string]string = make(map[string]string)
+	var hasAdd map[string]string = make(map[string]string)
 
 	// method level
 	if m.method != nil && len(m.method.Annotations) > 0 {
 		for _, annotation := range m.method.Annotations {
 			if factorys, ok := methodFilter[annotation.Name]; ok {
 				for _, factory := range factorys {
-					instance := factory.GetInstance(annotation.Value)
-					if instance != nil {
-						fs = append(fs, instance)
-						hasCreate[annotation.Name] = "1"
-					}
+					fs = append(fs, factory)
+					hasAdd[annotation.Name] = "1"
 				}
 			}
 		}
@@ -54,36 +50,28 @@ func (m *methodInvoke) initFilter() {
 
 	if m.clazz != nil && len(m.clazz.Annotations) > 0 {
 		for _, annotation := range m.clazz.Annotations {
-			if _, ok := hasCreate[annotation.Name]; ok {
+			if _, ok := hasAdd[annotation.Name]; ok {
 				continue
 			}
 			if factorys, ok := methodFilter[annotation.Name]; ok {
 				for _, factory := range factorys {
-					instance := factory.GetInstance(annotation.Value)
-					if instance != nil {
-						fs = append(fs, instance)
-					}
+					fs = append(fs, factory)
 				}
 			}
 		}
 	}
 
-	if len(fs) > 0 {
-		if len(fs) > 1 {
-			sort.Slice(fs, func(i, j int) bool {
-				return fs[i].Order() < fs[j].Order()
-			})
+	if len(fs) > 1 {
+		sort.Slice(fs, func(i, j int) bool {
+			return fs[i].Order() < fs[j].Order()
+		})
+	}
+	l := len(m.filters)
+	for i, f := range m.filters {
+		if i == (l - 1) {
+			break
 		}
-		m.filters = append(fs, executor)
-		l := len(m.filters)
-		for i, f := range m.filters {
-			if i == (l - 1) {
-				break
-			}
-			f.SetNext(m.filters[i+1])
-		}
-	} else {
-		m.filters = []ProxyFilter{executor}
+		f.SetNext(m.filters[i+1])
 	}
 }
 func (m *methodInvoke) invoke(context *context.LocalStack, args []reflect.Value) []reflect.Value {
@@ -115,18 +103,11 @@ func newMethodInvoke(
 // classProxy 好像没地方用到 key是全路径 GetClassName
 var classProxy map[string]*ProxyClass = make(map[string]*ProxyClass)
 
-// ProxyFilterFactory key annotation 名字 可以生产filter的factory实例
-var methodFilter map[string][]ProxyFilterFactory = make(map[string][]ProxyFilterFactory)
+var methodFilter map[string][]ProxyFilter = make(map[string][]ProxyFilter)
 
-var defaultExecuteFilter ProxyFilterFactory
-
-// AddDefaultInvokerFilterFactory 默认filter执行器
-func AddDefaultInvokerFilterFactory(target ProxyFilterFactory) {
-	defaultExecuteFilter = target
-}
-
-// AddProxyFilterFactory 添加拦截器
-func AddProxyFilterFactory(target ProxyFilterFactory) {
+// AddAopProxyFilter 添加拦截器
+func AddAopProxyFilter(target ProxyFilter) {
+	AddClassProxy(target.(ProxyTarger))
 
 	match := target.AnnotationMatch()
 	if len(match) == 0 {
@@ -137,7 +118,7 @@ func AddProxyFilterFactory(target ProxyFilterFactory) {
 		if v, ok := methodFilter[annotation]; ok {
 			methodFilter[annotation] = append(v, target)
 		} else {
-			methodFilter[annotation] = []ProxyFilterFactory{target}
+			methodFilter[annotation] = []ProxyFilter{target}
 		}
 	}
 

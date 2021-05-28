@@ -2,17 +2,10 @@ package proxy
 
 import (
 	"fmt"
+	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"reflect"
 )
-
-// ProxyFilterFactory
-// 每次创建filter都要创建两个类A，B, A用来实现ProxyFilter接口，B用来实现ProxyFilterFactory接口创建A
-type ProxyFilterFactory interface {
-	GetInstance(map[string]interface{}) ProxyFilter
-
-	AnnotationMatch() []string
-}
 
 // ProxyFilter 代理接口
 type ProxyFilter interface {
@@ -33,6 +26,8 @@ type ProxyFilter interface {
 
 	// Order 顺序
 	Order() int
+
+	AnnotationMatch() []string
 }
 
 // DefaultProxyFilter 默认可执行拦截器
@@ -54,25 +49,19 @@ func (d *DefaultProxyFilter) SetNext(next ProxyFilter) {
 }
 
 func (d *DefaultProxyFilter) Order() int {
-	return 999999
+	return 99999999
+}
+
+func (d *DefaultProxyFilter) AnnotationMatch() []string {
+	return nil
+}
+
+func (d *DefaultProxyFilter) ProxyTarget() *ProxyClass {
+	return nil
 }
 
 var defaultProxyFilter DefaultProxyFilter = DefaultProxyFilter{}
 
-type DefaultProxyFilterFactory struct {
-}
-
-func (d *DefaultProxyFilterFactory) GetInstance(m map[string]interface{}) ProxyFilter {
-	r1 := ProxyFilter(&defaultProxyFilter)
-	return r1
-}
-
-func (d *DefaultProxyFilterFactory) AnnotationMatch() []string {
-	return nil
-}
-
-var defaultProxyFilterFactory ProxyFilterFactory = ProxyFilterFactory(&DefaultProxyFilterFactory{})
-
 func init() {
-	AddDefaultInvokerFilterFactory(defaultProxyFilterFactory)
+	application.AddProxyInstance("", ProxyTarger(&defaultProxyFilter))
 }

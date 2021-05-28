@@ -15,9 +15,8 @@ func (h *AopLoadStrategy) LoadInstance(local *context.LocalStack, target ProxyTa
 	if target == nil {
 		return false
 	}
-	if f, ok := target.(ProxyFilterFactory); ok {
-		AddClassProxy(target)
-		AddProxyFilterFactory(f)
+	if f, ok := target.(ProxyFilter); ok {
+		AddAopProxyFilter(f)
 		return true
 	}
 	return false
