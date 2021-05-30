@@ -2,7 +2,7 @@ package http
 
 import (
 	"fmt"
-	"github.com/dxq174510447/goframe/lib/frame/proxy"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"sort"
 	"strings"
 )
@@ -15,7 +15,7 @@ type PathNode struct {
 	// 当type为2的时候 这里设置type
 	Key         string
 	Children    []*PathNode
-	ProxyMethod *proxy.ProxyMethod
+	ProxyMethod *proxyclass.ProxyMethod
 }
 
 func (p *PathNode) innerPrintTree(node *PathNode, depth int) {
@@ -104,7 +104,7 @@ func (p *PathNode) MatchMethod(requestPath string) (*PathNode, map[string]string
 	}
 	return nil, nil
 }
-func (p *PathNode) SetPath(configPath string, method *proxy.ProxyMethod) {
+func (p *PathNode) SetPath(configPath string, method *proxyclass.ProxyMethod) {
 	r2 := configPath
 	if r2[0:1] != "/" {
 		r2 = "/" + r2

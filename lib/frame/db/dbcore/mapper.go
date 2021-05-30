@@ -7,13 +7,28 @@ import (
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/exception"
-	"github.com/dxq174510447/goframe/lib/frame/proxy"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/core"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
+	"github.com/dxq174510447/goframe/lib/frame/util"
 	"reflect"
 	"regexp"
 	"strings"
 	"text/template"
 	"time"
 )
+
+//type DaoProxyTarger interface {
+//	proxy.ProxyTarger
+//	DaoXml() string
+//	DaoEntity() interface{}
+//}
+
+type DaoConfig struct {
+	// sql文件
+	Xml string
+	// entity 指针
+	Entity interface{}
+}
 
 type SqlProviderConfig struct {
 	Param string
@@ -57,7 +72,7 @@ func (m *MapperFactory) ReplaceImportTag(sql string, refs map[string]*MapperElem
 	return ns
 }
 
-func (m *MapperFactory) ParseXml(target proxy.ProxyTarger, content string) map[string]*MapperElementXml {
+func (m *MapperFactory) ParseXml(target proxyclass.ProxyTarger, content string) map[string]*MapperElementXml {
 	mapper := &MapperXml{}
 	err := xml.Unmarshal([]byte(content), mapper)
 
@@ -77,7 +92,7 @@ func (m *MapperFactory) ParseXml(target proxy.ProxyTarger, content string) map[s
 		for _, ele := range mapper.UpdateSql {
 			ele.SqlType = SqlTypeUpdate
 			ele.Sql = m.ReplaceImportTag(ele.Sql, refs)
-			ele.Tpl = template.Must(template.New(fmt.Sprintf("%s-%s", proxy.GetClassName(target), ele.Id)).Parse(ele.Sql))
+			ele.Tpl = template.Must(template.New(fmt.Sprintf("%s-%s", util.ClassUtil.GetClassName(target), ele.Id)).Parse(ele.Sql))
 			refs[ele.Id] = ele
 		}
 	}
@@ -86,7 +101,7 @@ func (m *MapperFactory) ParseXml(target proxy.ProxyTarger, content string) map[s
 		for _, ele := range mapper.InsertSql {
 			ele.SqlType = SqlTypeInsert
 			ele.Sql = m.ReplaceImportTag(ele.Sql, refs)
-			ele.Tpl = template.Must(template.New(fmt.Sprintf("%s-%s", proxy.GetClassName(target), ele.Id)).Parse(ele.Sql))
+			ele.Tpl = template.Must(template.New(fmt.Sprintf("%s-%s", util.ClassUtil.GetClassName(target), ele.Id)).Parse(ele.Sql))
 			refs[ele.Id] = ele
 		}
 	}
@@ -95,7 +110,7 @@ func (m *MapperFactory) ParseXml(target proxy.ProxyTarger, content string) map[s
 		for _, ele := range mapper.SelectSql {
 			ele.SqlType = SqlTypeSelect
 			ele.Sql = m.ReplaceImportTag(ele.Sql, refs)
-			ele.Tpl = template.Must(template.New(fmt.Sprintf("%s-%s", proxy.GetClassName(target), ele.Id)).Parse(ele.Sql))
+			ele.Tpl = template.Must(template.New(fmt.Sprintf("%s-%s", util.ClassUtil.GetClassName(target), ele.Id)).Parse(ele.Sql))
 			refs[ele.Id] = ele
 		}
 	}
@@ -104,7 +119,7 @@ func (m *MapperFactory) ParseXml(target proxy.ProxyTarger, content string) map[s
 		for _, ele := range mapper.DeleteSql {
 			ele.SqlType = SqlTypeDelete
 			ele.Sql = m.ReplaceImportTag(ele.Sql, refs)
-			ele.Tpl = template.Must(template.New(fmt.Sprintf("%s-%s", proxy.GetClassName(target), ele.Id)).Parse(ele.Sql))
+			ele.Tpl = template.Must(template.New(fmt.Sprintf("%s-%s", util.ClassUtil.GetClassName(target), ele.Id)).Parse(ele.Sql))
 			refs[ele.Id] = ele
 		}
 	}
@@ -128,8 +143,8 @@ type sqlColumnType struct {
 
 type sqlInvoke struct {
 	target         interface{}
-	clazz          *proxy.ProxyClass
-	method         *proxy.ProxyMethod
+	clazz          *proxyclass.ProxyClass
+	method         *proxyclass.ProxyMethod
 	mapper         map[string]*MapperElementXml
 	providerConfig *SqlProviderConfig
 	//slice int string ptr float64
@@ -142,6 +157,12 @@ type sqlInvoke struct {
 	structFieldMap map[string]reflect.StructField
 	sqlFieldMap    []*sqlColumnType
 	entityType     reflect.Type
+	//base sql
+	baseXmlEle map[string]*MapperElementXml
+	//如果使用到entity entity列定义
+	tableDef *TableDef
+	//当前方法是不是base里面的method
+	baseMethod bool
 }
 
 func (s *sqlInvoke) invoke(context *context.LocalStack, args []reflect.Value) []reflect.Value {
@@ -492,7 +513,7 @@ func (s *sqlInvoke) invokeInsert(local *context.LocalStack, args []reflect.Value
 		}
 	}
 
-	sql, err1 := s.getSqlFromTpl(local, args, sqlEle)
+	sql1, err1 := s.getSqlFromTpl(local, args, sqlEle)
 	if err1 != nil {
 		if errorFlag == 0 {
 			panic(err1)
@@ -505,7 +526,7 @@ func (s *sqlInvoke) invokeInsert(local *context.LocalStack, args []reflect.Value
 		}
 	}
 
-	sqlParam, newsql, err2 := s.getArgumentsFromSql(local, args, sql)
+	sqlParam, newsql, err2 := s.getArgumentsFromSql(local, args, sql1)
 	if err2 != nil {
 		if errorFlag == 0 {
 			panic(err2)
@@ -518,11 +539,11 @@ func (s *sqlInvoke) invokeInsert(local *context.LocalStack, args []reflect.Value
 		}
 	}
 	if newsql != "" {
-		sql = newsql
+		sql1 = newsql
 	}
-	fmt.Printf("Sql[%s]: %s \n", sqlEle.Id, sql)
+	fmt.Printf("Sql[%s]: %s \n", sqlEle.Id, sql1)
 	fmt.Printf("Paramters[%s]: %s \n", sqlEle.Id, GetSqlParamterStri(sqlParam))
-	stmt, err := con.Con.PrepareContext(con.Ctx, sql)
+	stmt, err := con.Con.PrepareContext(con.Ctx, sql1)
 	if err != nil {
 		if errorFlag == 0 {
 			panic(err)
@@ -548,6 +569,34 @@ func (s *sqlInvoke) invokeInsert(local *context.LocalStack, args []reflect.Value
 				return []reflect.Value{reflect.ValueOf(err1)}
 			}
 		}
+	}
+
+	if s.baseMethod && s.tableDef != nil && s.tableDef.IdColumn != nil &&
+		strings.ToUpper(s.tableDef.GenerationType) == "IDENTITY" {
+		// 这种情况 args[1] 就是entity
+		lid1, err2 := sqlResult.LastInsertId()
+
+		if err2 != nil {
+			if errorFlag == 0 {
+				panic(err2)
+			} else {
+				if s.returnSqlType != nil {
+					return []reflect.Value{*s.defaultReturnValue, reflect.ValueOf(err2)}
+				} else {
+					return []reflect.Value{reflect.ValueOf(err2)}
+				}
+			}
+		}
+
+		var llid1 interface{}
+		switch s.tableDef.IdColumn.Field.Type.Kind() {
+		case reflect.Int:
+			llid1 = &sql.NullInt32{Int32: int32(lid1), Valid: true}
+		case reflect.Int64:
+			llid1 = &sql.NullInt64{Int64: lid1, Valid: true}
+		}
+		enptr := args[1].Elem().Elem()
+		SetEntityFieldValue(&enptr, s.tableDef.IdColumn.Field, llid1)
 	}
 
 	if s.returnSqlType != nil {
@@ -601,7 +650,7 @@ func (s *sqlInvoke) getArgumentsFromSql(local *context.LocalStack, args []reflec
 	}
 	var result []interface{}
 	for _, v := range variables {
-		m := proxy.GetVariableValue(root, v)
+		m := core.GetVariableValue(root, v)
 		result = append(result, m)
 	}
 	return result, nsql, nil
@@ -758,7 +807,7 @@ func (s *sqlInvoke) coverToGoType(ct *sql.ColumnType) *sqlColumnType {
 
 	if len(s.structFieldMap) > 0 {
 		columnName := ct.Name()
-		fieldName := proxy.GetCamelCaseName(columnName)
+		fieldName := core.GetCamelCaseName(columnName)
 		if field, ok := s.structFieldMap[fieldName]; ok {
 			addDefaultType = false
 			result.field = &field
@@ -788,8 +837,8 @@ func (s *sqlInvoke) coverToGoType(ct *sql.ColumnType) *sqlColumnType {
 
 func newSqlInvoke(
 	target interface{}, //对象
-	clazz *proxy.ProxyClass, //代理信息
-	method *proxy.ProxyMethod, //当前方法代理信息
+	clazz *proxyclass.ProxyClass, //代理信息
+	method *proxyclass.ProxyMethod, //当前方法代理信息
 	mapper map[string]*MapperElementXml, //对应sql节点
 	returnSqlType reflect.Type, //返回的类型 不是error 如果没有就nil
 	providerConfig *SqlProviderConfig,
@@ -797,6 +846,10 @@ func newSqlInvoke(
 	structFieldMap map[string]reflect.StructField,
 	entityptr interface{},
 	baseMethod bool,
+	//base xml 节点
+	baseXmlEle map[string]*MapperElementXml,
+	//entity 解析结构
+	tableDef *TableDef,
 ) *sqlInvoke {
 
 	var returnSqlElementType reflect.Type = nil
@@ -811,8 +864,8 @@ func newSqlInvoke(
 
 				returnSqlElementType = entityType.Elem()
 
-				defaultReturnValue = proxy.GetMethodReturnDefaultValue(returnSqlType)
-				structFieldMap = proxy.GetStructField(entityType)
+				defaultReturnValue = core.GetMethodReturnDefaultValue(returnSqlType)
+				structFieldMap = core.GetStructField(entityType)
 			} else {
 				if returnSqlType.Elem().Kind() == reflect.Ptr {
 					returnSqlElementType = returnSqlType.Elem().Elem()
@@ -831,8 +884,8 @@ func newSqlInvoke(
 			returnSqlType = reflect.TypeOf(entityptr)
 			returnSqlElementType = returnSqlType.Elem()
 
-			defaultReturnValue = proxy.GetMethodReturnDefaultValue(returnSqlType)
-			structFieldMap = proxy.GetStructField(returnSqlType)
+			defaultReturnValue = core.GetMethodReturnDefaultValue(returnSqlType)
+			structFieldMap = core.GetStructField(returnSqlType)
 		default:
 			returnSqlElementType = returnSqlType
 		}
@@ -848,19 +901,42 @@ func newSqlInvoke(
 		defaultReturnValue:   defaultReturnValue,
 		structFieldMap:       structFieldMap,
 		returnSqlElementType: returnSqlElementType,
+		baseXmlEle:           baseXmlEle,
+		tableDef:             tableDef,
+		baseMethod:           baseMethod,
 	}
 }
 
-func AddMapperProxyTarget(target1 proxy.ProxyTarger, xml string, entity interface{}) {
+func GetDaoConfig(target1 proxyclass.ProxyTarger) *DaoConfig {
+	if target1 == nil || target1.ProxyTarget() == nil || len(target1.ProxyTarget().Annotations) == 0 {
+		return nil
+	}
+	for _, anno := range target1.ProxyTarget().Annotations {
+		if anno.Name == proxyclass.AnnotationDao {
+			if v, f := anno.Value[AnnotationDaoConfigValueKey]; f {
+				configDao := v.(*DaoConfig)
+				return configDao
+			}
+		}
+	}
+	return nil
+}
+
+func AddMapperProxyTarget(target1 proxyclass.ProxyTarger) {
 
 	//解析字段方法 包裹一层
 	rv := reflect.ValueOf(target1)
 	rt := rv.Elem().Type()
 
-	xmlele := mapperFactory.ParseXml(target1, xml)
+	daoConfig := GetDaoConfig(target1)
+
+	xmlele := mapperFactory.ParseXml(target1, daoConfig.Xml)
 	var baseXmlEle map[string]*MapperElementXml
+
+	var tableDef *TableDef
+	dapEntity := daoConfig.Entity
 	if BaseXml != "" {
-		tableDef := parseEntityType(entity)
+		tableDef = parseEntityType(dapEntity)
 		buf := &bytes.Buffer{}
 		err1 := BaseXmlTpl.Execute(buf, tableDef)
 		if err1 != nil {
@@ -869,7 +945,7 @@ func AddMapperProxyTarget(target1 proxy.ProxyTarger, xml string, entity interfac
 		baseXmlEle = mapperFactory.ParseXml(target1, buf.String())
 	}
 
-	methodRef := make(map[string]*proxy.ProxyMethod)
+	methodRef := make(map[string]*proxyclass.ProxyMethod)
 	if len(target1.ProxyTarget().Methods) != 0 {
 		for _, md := range target1.ProxyTarget().Methods {
 			methodRef[md.Name] = md
@@ -884,33 +960,39 @@ func AddMapperProxyTarget(target1 proxy.ProxyTarger, xml string, entity interfac
 					for j := 0; j < m2; j++ {
 						basefield := field.Type.Field(j)
 						target := rv.Elem().FieldByName(field.Name)
-						addCallerToField(target1, &target, &basefield, methodRef, baseXmlEle, entity, true)
+						addCallerToField(target1, &target, &basefield, methodRef,
+							baseXmlEle, dapEntity, true,
+							baseXmlEle, tableDef)
 					}
 				}
 			} else if field.Type.Kind() == reflect.Func && rv.Elem().FieldByName(field.Name).IsNil() {
 				target := rv.Elem()
-				addCallerToField(target1, &target, &field, methodRef, xmlele, entity, false)
+				addCallerToField(target1, &target, &field, methodRef,
+					xmlele, dapEntity, false,
+					baseXmlEle, tableDef)
 			}
 		}
 	}
 
-	proxy.AddClassProxy(target1)
+	core.AddClassProxy(target1)
 }
 
-func addCallerToField(target1 proxy.ProxyTarger,
+func addCallerToField(target1 proxyclass.ProxyTarger,
 	target *reflect.Value,
 	field *reflect.StructField,
-	methodRef map[string]*proxy.ProxyMethod,
+	methodRef map[string]*proxyclass.ProxyMethod,
 	xmlele map[string]*MapperElementXml,
 	entityptr interface{},
 	baseMethod bool,
+	baseXmlEle map[string]*MapperElementXml,
+	tableDef *TableDef,
 ) {
 	call := target.FieldByName(field.Name)
 
 	methodName := strings.ReplaceAll(field.Name, "_", "")
 	methodSetting, ok := methodRef[methodName]
 	if !ok {
-		methodSetting = &proxy.ProxyMethod{Name: methodName}
+		methodSetting = &proxyclass.ProxyMethod{Name: methodName}
 	}
 
 	var providerConfig *SqlProviderConfig = nil
@@ -927,16 +1009,20 @@ func addCallerToField(target1 proxy.ProxyTarger,
 	var invoker *sqlInvoke
 	fo := field.Type.NumOut()
 	if fo >= 2 {
-		defaultReturnValue := proxy.GetMethodReturnDefaultValue(field.Type.Out(0))
-		structFields := proxy.GetStructField(field.Type.Out(0))
+		defaultReturnValue := core.GetMethodReturnDefaultValue(field.Type.Out(0))
+		structFields := core.GetStructField(field.Type.Out(0))
 		invoker = newSqlInvoke(target1, target1.ProxyTarget(),
 			methodSetting,
 			xmlele, field.Type.Out(0),
-			providerConfig, defaultReturnValue, structFields, entityptr, baseMethod)
+			providerConfig, defaultReturnValue, structFields, entityptr, baseMethod,
+			baseXmlEle,
+			tableDef)
 	} else {
 		invoker = newSqlInvoke(target1, target1.ProxyTarget(), methodSetting,
 			xmlele, nil,
-			providerConfig, nil, nil, entityptr, baseMethod)
+			providerConfig, nil, nil, entityptr, baseMethod,
+			baseXmlEle,
+			tableDef)
 	}
 
 	proxyCall := func(command *sqlInvoke) reflect.Value {
@@ -948,8 +1034,8 @@ func addCallerToField(target1 proxy.ProxyTarger,
 	call.Set(proxyCall)
 }
 
-func NewSqlProvierConfigAnnotation(param string) *proxy.AnnotationClass {
-	return &proxy.AnnotationClass{
+func NewSqlProvierConfigAnnotation(param string) *proxyclass.AnnotationClass {
+	return &proxyclass.AnnotationClass{
 		Name: AnnotationSqlProviderConfig,
 		Value: map[string]interface{}{
 			AnnotationSqlProviderConfigValueKey: &SqlProviderConfig{
@@ -1216,4 +1302,25 @@ var removeEmptyRowReg *regexp.Regexp = regexp.MustCompile(`(?m)^\s*$\n`)
 
 func RemoveEmptyRow(content string) string {
 	return removeEmptyRowReg.ReplaceAllString(content, "")
+}
+
+func GetDaoAnnotation(annotations []*proxyclass.AnnotationClass) *proxyclass.AnnotationClass {
+	for _, annotation := range annotations {
+		if annotation.Name == proxyclass.AnnotationDao {
+			return annotation
+		}
+	}
+	return nil
+}
+
+func NewDaoAnnotation(xml string, entity interface{}) *proxyclass.AnnotationClass {
+	return &proxyclass.AnnotationClass{
+		Name: proxyclass.AnnotationDao,
+		Value: map[string]interface{}{
+			AnnotationDaoConfigValueKey: &DaoConfig{
+				Xml:    xml,
+				Entity: entity,
+			},
+		},
+	}
 }

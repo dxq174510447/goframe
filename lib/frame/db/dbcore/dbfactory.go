@@ -3,7 +3,11 @@ package dbcore
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"github.com/dxq174510447/goframe/lib/frame/application"
+	context2 "github.com/dxq174510447/goframe/lib/frame/context"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	_ "github.com/go-sql-driver/mysql"
 	"reflect"
 	"strconv"
@@ -17,27 +21,15 @@ func AddDatabaseRouter(key string, db *sql.DB) {
 	databaseRouter[key] = db
 }
 
-type DatabaseFactory struct {
-	DbUser string
-	DbPwd  string
-	DbName string
-	DbPort string
-	DbHost string
-	Prop   map[string]string
-}
-
-func (c *DatabaseFactory) NewDatabase() *sql.DB {
-	//user:password@tcp(localhost:5555)/dbname?characterEncoding=UTF-8
-	url := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=true&loc=Local",
-		c.DbUser, c.DbPwd, c.DbHost, c.DbPort, c.DbName,
-	)
-	fmt.Println(url)
-	db, _ := sql.Open("mysql", url)
-	db.SetConnMaxLifetime(time.Minute * 3)
-	db.SetMaxOpenConns(1000)
-	db.SetMaxIdleConns(20)
-	return db
-}
+//type DatabaseFactory struct {
+//	DbUser string
+//	DbPwd  string
+//	DbName string
+//	DbPort string
+//	DbHost string
+//	Prop   map[string]string
+//}
+//
 
 type DatabaseConnection struct {
 	Db    *sql.DB
@@ -94,7 +86,7 @@ func (d *DatabaseConnection) Rollback() {
 }
 
 // OpenSqlConnection 是否只读 1是 0否
-func OpenSqlConnection(readOnly int) *DatabaseConnection {
+func OpenSqlConnection(local *context2.LocalStack, readOnly int) *DatabaseConnection {
 
 	ctx := context.Background()
 	txOpt := sql.TxOptions{
@@ -103,7 +95,7 @@ func OpenSqlConnection(readOnly int) *DatabaseConnection {
 	}
 
 	// 取默认的key
-	var key string = DataBaseDefaultKey
+	var key string = GetDbRouteKey(local)
 	var db *sql.DB = databaseRouter[key]
 	conn, err1 := db.Conn(ctx)
 
@@ -136,17 +128,75 @@ func OpenSqlConnection(readOnly int) *DatabaseConnection {
 	}
 }
 
+func NewDatabase(c *DatabaseConfig, key string) *DatabaseInstance {
+	//user:password@tcp(localhost:5555)/dbname?characterEncoding=UTF-8
+	url := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=true&loc=Local",
+		c.DbUser, c.DbPwd, c.DbHost, c.DbPort, c.DbName,
+	)
+	fmt.Println(url)
+	db, _ := sql.Open("mysql", url)
+	db.SetConnMaxLifetime(time.Minute * 3)
+	db.SetMaxOpenConns(1000)
+	db.SetMaxIdleConns(20)
+
+	id := fmt.Sprintf("DbConnect_%s", key)
+
+	return &DatabaseInstance{
+		Db:     db,
+		Id:     id,
+		Config: c,
+	}
+}
+
+type DatabaseConfig struct {
+	DbUser    string
+	DbPwd     string
+	DbName    string
+	DbPort    string
+	DbHost    string
+	Prop      map[string]string
+	Proparray []string
+	// proxy 全局唯一
+}
+
+type DatabaseInstance struct {
+	Db     *sql.DB
+	Id     string
+	Config *DatabaseConfig
+}
+
+func (d *DatabaseInstance) ProxyTarget() *proxyclass.ProxyClass {
+	return nil
+}
+
+type DatabaseFactory struct {
+}
+
+func (d *DatabaseFactory) ProxyTarget() *proxyclass.ProxyClass {
+	return nil
+}
+
+func (d *DatabaseFactory) ProxyGet(local *context2.LocalStack, application1 *application.FrameApplication, applicationContext *application.FrameApplicationContext) proxyclass.ProxyTarger {
+	var setting map[string]*DatabaseConfig = make(map[string]*DatabaseConfig)
+	applicationContext.Environment.GetObjectValue("platform.datasource.config", setting)
+
+	s, _ := json.Marshal(setting)
+	fmt.Println("dbsetting--->", string(s))
+
+	for k, v := range setting {
+		db := NewDatabase(v, k)
+		AddDatabaseRouter(k, db.Db)
+
+		application1.FrameResource.ProxyInsPool.Push(&application.DynamicProxyInstanceNode{
+			Target: db,
+			Id:     db.Id,
+		})
+	}
+	return nil
+}
+
+var databaseFactory DatabaseFactory = DatabaseFactory{}
+
 func init() {
-
-	// 初始化默认数据源
-	//var defaultFactory DatabaseFactory = DatabaseFactory{
-	//	dbUser: util.ConfigUtil.Get("DB_USER", "platform"),
-	//	dbPwd:  util.ConfigUtil.Get("DB_PASSWORD", "xxcxcx"),
-	//	dbName: util.ConfigUtil.Get("DB_NAME", "plat_base1"),
-	//	dbPort: util.ConfigUtil.Get("DB_PORT", "3306"),
-	//	dbHost: util.ConfigUtil.Get("DB_HOST", "rm-bp1thh63s5tx33q0kio.mysql.rds.aliyuncs.com"),
-	//}
-	//db := defaultFactory.NewDatabase()
-	//AddDatabaseRouter(DataBaseDefaultKey, db)
-
+	application.AddProxyInstance("", proxyclass.ProxyTarger(&databaseFactory))
 }

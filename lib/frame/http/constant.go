@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/context"
-	"github.com/dxq174510447/goframe/lib/frame/proxy"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"net/http"
 	"runtime"
 )
@@ -61,11 +61,21 @@ func GetCurrentFilterIndex(local *context.LocalStack) int {
 	return index.(int)
 }
 
-func GetRequestAnnotationSetting(annotations []*proxy.AnnotationClass) *RestAnnotationSetting {
+func GetRequestAnnotationSetting(annotations []*proxyclass.AnnotationClass) *RestAnnotationSetting {
 	for _, annotation := range annotations {
-		if annotation.Name == AnnotationRestController {
-			r, _ := annotation.Value[AnnotationValueRestKey]
-			return r.(*RestAnnotationSetting)
+		if annotation.Name == AnnotationRestController || annotation.Name == AnnotationController {
+			if r, ok := annotation.Value[AnnotationValueRestKey]; ok {
+				return r.(*RestAnnotationSetting)
+			}
+			return nil
+		}
+	}
+	return nil
+}
+func GetRequestAnnotation(annotations []*proxyclass.AnnotationClass) *proxyclass.AnnotationClass {
+	for _, annotation := range annotations {
+		if annotation.Name == AnnotationRestController || annotation.Name == AnnotationController {
+			return annotation
 		}
 	}
 	return nil
@@ -76,8 +86,8 @@ func NewRestAnnotation(httpPath string,
 	methodParameter string,
 	pathVariable string,
 	headerParameter string,
-	methodRender string) *proxy.AnnotationClass {
-	return &proxy.AnnotationClass{
+	methodRender string) *proxyclass.AnnotationClass {
+	return &proxyclass.AnnotationClass{
 		Name: AnnotationRestController,
 		Value: map[string]interface{}{
 			AnnotationValueRestKey: &RestAnnotationSetting{
@@ -103,20 +113,4 @@ func PrintStackTrace(err interface{}) string {
 		fmt.Fprintf(buf, "%s:%d (0x%x)\n", file, line, pc)
 	}
 	return buf.String()
-}
-
-func GetControllerPathPrefix(dispatchServlet *DispatchServlet, target proxy.ProxyTarger) string {
-	//context-path
-	var sp string = DefaultServletPath
-	if sp == "/" {
-		sp = ""
-	}
-
-	//controller-path
-	var classRestSetting *RestAnnotationSetting = GetRequestAnnotationSetting(target.ProxyTarget().Annotations)
-	var cp string = classRestSetting.HttpPath
-	if cp == "/" {
-		cp = ""
-	}
-	return fmt.Sprintf("%s%s", sp, cp)
 }

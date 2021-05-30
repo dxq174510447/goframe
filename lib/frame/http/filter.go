@@ -2,6 +2,8 @@ package http
 
 import (
 	"github.com/dxq174510447/goframe/lib/frame/context"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/core"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"net/http"
 	"sort"
 )
@@ -42,6 +44,9 @@ func GetDefaultFilterChain() *DefaultFilterChain {
 }
 
 func AddFilter(filter Filter) {
+
+	core.AddClassProxy(filter.(proxyclass.ProxyTarger))
+
 	d := append(defaultFilterChain.filters, filter)
 	if len(d) > 1 {
 		sort.Slice(d, func(i, j int) bool {

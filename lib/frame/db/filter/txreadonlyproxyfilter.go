@@ -2,22 +2,22 @@ package filter
 
 import (
 	"fmt"
+	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/db/dbcore"
-	"github.com/dxq174510447/goframe/lib/frame/proxy"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"reflect"
 )
 
 // TxReadOnlyProxyFilter 只读事物
 type TxReadOnlyProxyFilter struct {
-	Next proxy.ProxyFilter
 }
 
 func (d *TxReadOnlyProxyFilter) Execute(context *context.LocalStack,
-	classInfo *proxy.ProxyClass,
-	methodInfo *proxy.ProxyMethod,
+	classInfo *proxyclass.ProxyClass,
+	methodInfo *proxyclass.ProxyMethod,
 	invoker *reflect.Value,
-	arg []reflect.Value) []reflect.Value {
+	arg []reflect.Value, next *proxyclass.ProxyFilterWrapper) []reflect.Value {
 
 	fmt.Printf("TxReadOnlyProxyFilter begin \n")
 	defer fmt.Printf("TxReadOnlyProxyFilter end \n")
@@ -36,7 +36,7 @@ func (d *TxReadOnlyProxyFilter) Execute(context *context.LocalStack,
 
 	if addNewConnection {
 		// 开启新的连接
-		con := dbcore.OpenSqlConnection(1)
+		con := dbcore.OpenSqlConnection(context, 1)
 		fmt.Printf("当前线程初始化新的 connectionId %s \n", con.ConnectId)
 
 		// 将当前新的连接放入新的local变量中
@@ -81,33 +81,24 @@ func (d *TxReadOnlyProxyFilter) Execute(context *context.LocalStack,
 		}
 	}
 
-	return d.Next.Execute(context, classInfo, methodInfo, invoker, arg)
+	return next.Execute(context, classInfo, methodInfo, invoker, arg)
 
-}
-
-func (d *TxReadOnlyProxyFilter) SetNext(next proxy.ProxyFilter) {
-	d.Next = next
 }
 
 func (d *TxReadOnlyProxyFilter) Order() int {
 	return 3
 }
 
-var txReadOnlyProxyFilter TxReadOnlyProxyFilter = TxReadOnlyProxyFilter{}
-
-type TxReadOnlyProxyFilterFactory struct {
-}
-
-func (d *TxReadOnlyProxyFilterFactory) GetInstance(m map[string]interface{}) proxy.ProxyFilter {
-	return proxy.ProxyFilter(&txReadOnlyProxyFilter)
-}
-
-func (d *TxReadOnlyProxyFilterFactory) AnnotationMatch() []string {
+func (d *TxReadOnlyProxyFilter) AnnotationMatch() []string {
 	return []string{dbcore.TransactionReadOnly}
 }
 
-var txReadOnlyProxyFilterFactory TxReadOnlyProxyFilterFactory = TxReadOnlyProxyFilterFactory{}
+func (d *TxReadOnlyProxyFilter) ProxyTarget() *proxyclass.ProxyClass {
+	return nil
+}
+
+var txReadOnlyProxyFilter TxReadOnlyProxyFilter = TxReadOnlyProxyFilter{}
 
 func init() {
-	proxy.AddProxyFilterFactory(proxy.ProxyFilterFactory(&txReadOnlyProxyFilterFactory))
+	application.AddProxyInstance("", proxyclass.ProxyTarger(&txReadOnlyProxyFilter))
 }
