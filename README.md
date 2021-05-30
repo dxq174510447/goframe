@@ -1,134 +1,52 @@
 ## mvc(springboot),aop(filter-chain),orm(mybatis)
 
-## 案例见 firstgo
+## 案例见 仓库下的 firstgo
+
+## 不支持(可能是永久不支持也可能是暂时不支持)
+1. 配置文件注入到struct不支持混合类型（支持内嵌）
+2. sql查询当参数类型是指针struct的时候，不支持混合（支持内嵌）
 
 ## 前提
 1. struct-->类   
-2. 所有的controller,service,dao都是单例    
-3. 所有的aop都是基于类字段类型是func来动态包裹一层来实现的，所以调用类的方法，在通过类的方法中去调用类的字段，然后字段在初始化的时候去设置它的实现    
-4. 在类调用中最好不要直接使用字段，方法和字段命令规则，字段在方法的后面加上"_"即可，例如方法  
-```
-   type UsersController struct {
-       Save_         func(local *context.LocalStack, param *vo.UsersAdd, self *UsersController) *vo.UsersVo
-   }
-   func (c *UsersController) Save(local *context.LocalStack, param *vo.UsersAdd) *vo2.JsonResult {
-       result := c.Save_(local, param, c)
-       return util.JsonUtil.BuildJsonSuccess(result)
-   }
-```
-   
-5. 所有方法第一个参数必须是*context.LocalStack，类似java中的threadlocal类型
+2. 所有的controller,service,dao都是单例     
+3. 所有的aop都是基于方法中调用类字段函数，类在加载到容器中会解析字段函数，在其外层在包裹一层在重新赋值给该字段（后面如果有更好的实现会替换掉，毕竟凭空多一个字段函数还是有点别扭）   
+4. 在类调用中最好不要直接使用字段，方法和字段命令规则，字段在方法的后面加上"_"即可，例如方法   
+5. 所有方法第一个参数必须是*context.LocalStack，类似java中的threadlocal类型  
    
 ### mvc(springboot)
-见demo  
-```golang
-//.....
 
-func (c *UsersController) ChangeStatus(
-    local *context.LocalStack,
-    id int, status int,
-    requestId int,
-    yid int, ystatus int) *vo2.JsonResult {
-    fmt.Println(id, status, requestId, yid, ystatus)
-    c.ChangeStatus_(local, id, status, c)
-    return util.JsonUtil.BuildJsonSuccess(nil)
-}
-// 对应的方法注解
+#### 支持yaml配置文件
+见demo configyml.go，localconfigyml.go 类似spring的配置，可以注入到容器实例中，或者从环境中获取
 
-{
-    Name: "ChangeStatus",
-        Annotations: []*proxy.AnnotationClass{
-        http.NewRestAnnotation(
-        	"/change/{yid}/status/{ystatus}",  //请求url
-        	"post",  //请求method
-            "_,id,status,_,_,_", //方法中query(form)中的参数位置和request中的key
-            "_,_,_,_,yid,ystatus", //方法中路径参数位置和对应的key
-            "_,_,_,requestId,_,_", //方法中header中的参数位置和header中的key
-            ""), // 返回视图模式 默认json
-    },
-},
+#### 支持http filter
+见demo binduserfilter.go 实现http.Filter即可
 
-```
+#### 控制器支持类似spring注解  
+见demo userscontroller.go   
+1. 直接将控制器的方法映射到http的handle函数中，可以设置控制器方法对应的http路径和http method   
+2. 直接将request中的参数映射到控制器方法中的参数，支持requestbody，query，form，head，path。(暂时不支持上传)  
+4. 控制器方法可直接返回指针类，根据视图模型渲染返回的结果。默认是json序列化   
+5. 后续支持根据控制器生成swagger文档   
 
 ### orm(mybatis)
-1. 建议返回返回两个结果（测试案例都是返回两个结果），error放在最后面    
-2. struct结构都是返回指针类型，无论是slice还是单个
-3. 原有mybatis 只支持include标签
-4. sql语句支持golang模版
-5. 如果有多个参数，必须要指定每个参数的别名，在sql中使用别名
+见demo dao目录下的usersdao.go，usersxml.go  
+1. 只需要把方法写出来即可，不需要去实现，默认会找到对应的sql并执行(类似mybatis mapper接口的用法)  
+2. 将dao和sql分开管理，会有专门的go文件里面就是sql的xml内容     
+3. sql支持golang模版用法，循环判断等   
+4. 支持查询参数是结构体指针，基础类型，string等   
+5. 根据threadlocal中的变量，失败是返回error还是panic。默认panic  
+6. 内嵌数据库拦截器。daoconnectproxyfilter.go，txreadonlyproxyfilter.go，txrequirenewproxyfilter.go，txrequireproxyfilter.go。对应的是数据库连接，只读事物，新事物和线程事物拦截  
+7. 包含BaseDao可以混合到其它dao中  
 
-见案例 
-
-```
-// userdao.go
-type UsersDao struct {
-    FindByNameAndStatus_ func(local *context.LocalStack, name string, status int, statusList []string) ([]*po.Users, error)
-}
-func (c *UsersDao) FindByNameAndStatus(local *context.LocalStack, name string, status int, statusList []string) ([]*po.Users, error) {
-	return c.FindByNameAndStatus_(local, name, status, statusList)
-}
-
-// userdaoxml.go 部分代码
-<select id="FindByNameAndStatus">
-			select * from users where   
-			<include refid="conditionA1"></include>
-           order by id desc 
-	</select>
-
-	<sql id="conditionA1">
-		name = #{name} and status = #{status} 
-		{{if .statusList}}
-			and status in (
-				{{range $index, $ele := $.statusList}}{{if $index}},{{end}}#{statusList[{{$index}}]}{{end}}
-			)
-		{{end}}
-	</sql>
-
-	<select id="FindIds">
-			select id from users order by id desc 
-	</select>
-
-	<select id="FindNames">
-			select distinct name from users 
-			where 1=1
-<![CDATA[
-			{{if .NameIn}}
-				and name in (
-					{{range $index, $ele := $.NameIn}}{{if $index}},{{end}}#{NameIn[{{$index}}]}{{end}}
-				)
-			{{end}}
-			and status < 1
-]]>
-			order by id desc 
-	</select>
-```
+使用建议
+1. 建议返回返回两个结果（测试案例都是返回两个结果），error放在最后面       
+2. struct结构都是返回指针类型，无论是slice还是单个  
+3. 熟悉mybatis的，这个只支持include标签  
 
 
 ### aop
-需要实现ProxyTarger接口,具体见demo
-
-```
-
-type ProxyTarger interface {
-	ProxyTarget() *ProxyClass  //ProxyClass 类似java的注解，
-}
-
-
-```
-
-### http filter
-见 BindUserFilter
-
-
-### controller,service,dao aop
-见 TxRequireNewProxyFilter
+需要实现ProxyTarger接口,具体见demo txrequireproxyfilter.go  
 
 ### 在持续优化中
 
 ### 20210520-20210528 v1.1
-#### bug
-1. 保存的时候如果是递增，把id设置到对应到字段上
-
-
-#### 优化项
-1. 由于init执行顺序问题，改成代理加载分两步，init中先把实例放到容器中，启动到时候去加载这些类实例实现aop
