@@ -3,15 +3,20 @@ package http
 import (
 	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
-	"github.com/dxq174510447/goframe/lib/frame/proxy"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 )
 
 type HttpControllerLoadStrategy struct {
 }
 
-func (h *HttpControllerLoadStrategy) LoadInstance(local *context.LocalStack, target proxy.ProxyTarger,
+func (h *HttpControllerLoadStrategy) LoadInstance(local *context.LocalStack, target1 *application.DynamicProxyInstanceNode,
 	application *application.FrameApplication,
 	applicationContext *application.FrameApplicationContext) bool {
+
+	if target1 == nil {
+		return false
+	}
+	target := target1.Target
 	if target == nil || target.ProxyTarget() == nil {
 		return false
 	}
@@ -30,7 +35,7 @@ func (h *HttpControllerLoadStrategy) Order() int {
 	return 100
 }
 
-func (h *HttpControllerLoadStrategy) ProxyTarget() *proxy.ProxyClass {
+func (h *HttpControllerLoadStrategy) ProxyTarget() *proxyclass.ProxyClass {
 	return nil
 }
 
@@ -43,13 +48,14 @@ func GetHttpControllerLoadStrategy() *HttpControllerLoadStrategy {
 type HttpFilterLoadStrategy struct {
 }
 
-func (h *HttpFilterLoadStrategy) LoadInstance(local *context.LocalStack, target proxy.ProxyTarger,
+func (h *HttpFilterLoadStrategy) LoadInstance(local *context.LocalStack, target1 *application.DynamicProxyInstanceNode,
 	application *application.FrameApplication,
 	applicationContext *application.FrameApplicationContext) bool {
 
-	if target == nil {
+	if target1 == nil {
 		return false
 	}
+	target := target1.Target
 	if f, ok := target.(Filter); ok {
 		AddFilter(f)
 		return true
@@ -61,7 +67,7 @@ func (h *HttpFilterLoadStrategy) Order() int {
 	return 90
 }
 
-func (h *HttpFilterLoadStrategy) ProxyTarget() *proxy.ProxyClass {
+func (h *HttpFilterLoadStrategy) ProxyTarget() *proxyclass.ProxyClass {
 	return nil
 }
 
@@ -72,6 +78,6 @@ func GetHttpFilterLoadStrategy() *HttpFilterLoadStrategy {
 }
 
 func init() {
-	application.AddProxyInstance("", proxy.ProxyTarger(&httpControllerLoadStrategy))
-	application.AddProxyInstance("", proxy.ProxyTarger(&httpFilterLoadStrategy))
+	application.AddProxyInstance("", proxyclass.ProxyTarger(&httpControllerLoadStrategy))
+	application.AddProxyInstance("", proxyclass.ProxyTarger(&httpFilterLoadStrategy))
 }

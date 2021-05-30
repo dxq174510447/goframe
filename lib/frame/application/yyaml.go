@@ -75,8 +75,10 @@ func (y *YamlTree) getBaseValueFromNode(key string) string {
 	}
 
 	k1 := fmt.Sprintf(".%s", key)
+
 	//fmt.Println(k1)
 	if current, ok := y.RefNode[k1]; ok {
+		//fmt.Println("---key",k1,current.RowValue)
 		return current.RowValue
 	} else {
 		return ""
@@ -160,41 +162,284 @@ func (y *YamlTree) GetElValue(el1 string) string {
 	return str
 }
 
-func (y *YamlTree) setStructValue(current *YamlNode,
-	field *reflect.StructField,
-	fieldValue *reflect.Value) {
-	// TODO
-}
-
-// GetStructValue key中不支持数组
-func (y *YamlTree) GetStructValue(key string, val interface{}) {
-	current := y.Root
-
-	ks := strings.Split(key, ".")
-	for _, k := range ks {
+func (y *YamlTree) setObjectValue(link string, current *YamlNode,
+	rt reflect.Type,
+	rv *reflect.Value) *reflect.Value {
+	switch rt.Kind() {
+	case reflect.Map:
+		//keyrt := rt.Key()//默认是string
 		if len(current.Children) == 0 {
-			current = nil
-			break
-		} else {
-			if cn, ok := current.ChildMap[k]; ok {
-				current = cn
-			} else {
-				current = nil
-				break
+			return nil
+		}
+		valrt := rt.Elem()
+		for _, childNode := range current.Children {
+			childkey := fmt.Sprintf("%s.%s", link, childNode.NodeName)
+			switch valrt.Kind() {
+			case reflect.Map:
+				valvalrt := valrt.Elem()
+				valmaprt := reflect.MapOf(reflect.TypeOf(""), valvalrt)
+				valmaprv := reflect.MakeMap(valmaprt)
+				//m1 := valmaprv.Elem()
+				y.setObjectValue(childkey, childNode, valmaprt, &valmaprv)
+				rv.SetMapIndex(reflect.ValueOf(childNode.NodeName), valmaprv)
+			case reflect.Struct:
+				valrv1 := reflect.New(valrt)
+				valrv := valrv1.Elem()
+				y.setObjectValue(childkey, childNode, valrt, &valrv)
+				rv.SetMapIndex(reflect.ValueOf(childNode.NodeName), valrv)
+			case reflect.Ptr:
+				valrv1 := reflect.New(valrt.Elem())
+				valrv := valrv1.Elem()
+				y.setObjectValue(childkey, childNode, valrt.Elem(), &valrv)
+				rv.SetMapIndex(reflect.ValueOf(childNode.NodeName), valrv1)
+			case reflect.Slice:
+				valarrrt := reflect.SliceOf(valrt.Elem())
+				valrv1 := reflect.MakeSlice(valarrrt, 0, 0)
+				//valrv := valrv1.Elem()
+				sn := y.setObjectValue(childkey, childNode, valarrrt, &valrv1)
+				if sn != nil {
+					rv.SetMapIndex(reflect.ValueOf(childNode.NodeName), *sn)
+				}
+			case reflect.String:
+				v := y.GetBaseValue(childkey)
+				rv.SetMapIndex(reflect.ValueOf(childNode.NodeName), reflect.ValueOf(v))
+			case reflect.Int:
+				v := y.GetBaseValue(childkey)
+				if v != "" {
+					v1, _ := strconv.Atoi(v)
+					rv.SetMapIndex(reflect.ValueOf(childNode.NodeName), reflect.ValueOf(v1))
+				}
+
+			case reflect.Int64:
+				v := y.GetBaseValue(childkey)
+				if v != "" {
+					v1, _ := strconv.ParseInt(v, 10, 64)
+					rv.SetMapIndex(reflect.ValueOf(childNode.NodeName), reflect.ValueOf(v1))
+				}
+			case reflect.Float64:
+				v := y.GetBaseValue(childkey)
+				if v != "" {
+					v1, _ := strconv.ParseFloat(v, 64)
+					rv.SetMapIndex(reflect.ValueOf(childNode.NodeName), reflect.ValueOf(v1))
+				}
 			}
 		}
+	case reflect.Struct:
+		if len(current.Children) == 0 {
+			return nil
+		}
+		nf := rt.NumField()
+
+		var childMap map[string]*YamlNode = make(map[string]*YamlNode)
+		for _, child := range current.Children {
+			if child.NodeName == "" {
+				continue
+			}
+			k := strings.ToUpper(strings.TrimSpace(removeSpecialChar(child.NodeName)))
+			childMap[k] = child
+		}
+		for i := 0; i < nf; i++ {
+			f := rt.Field(i)
+
+			if f.Name == "" {
+				continue
+			}
+			k := strings.ToUpper(strings.TrimSpace(removeSpecialChar(f.Name)))
+			var childNode *YamlNode
+			if cn, ok := childMap[k]; ok {
+				childNode = cn
+			} else {
+
+				continue
+			}
+
+			childkey := fmt.Sprintf("%s.%s", link, childNode.NodeName)
+
+			switch f.Type.Kind() {
+			case reflect.Map:
+				valvalrt := f.Type.Elem()
+				valmaprt := reflect.MapOf(reflect.TypeOf(""), valvalrt)
+				valmaprv := reflect.MakeMap(valmaprt)
+				//m1 := valmaprv.Elem()
+				y.setObjectValue(childkey, childNode, valmaprt, &valmaprv)
+				rv.FieldByName(f.Name).Set(valmaprv)
+			case reflect.Struct:
+				fv := rv.FieldByName(f.Name)
+				y.setObjectValue(childkey, childNode, f.Type, &fv)
+			case reflect.Ptr:
+				valrv1 := reflect.New(f.Type.Elem())
+				valrv := valrv1.Elem()
+				y.setObjectValue(childkey, childNode, f.Type.Elem(), &valrv)
+				rv.FieldByName(f.Name).Set(valrv1)
+			case reflect.Slice:
+				valarrrt := reflect.SliceOf(f.Type.Elem())
+				valrv1 := reflect.MakeSlice(valarrrt, 0, 0)
+
+				mv := &valrv1
+				sn := y.setObjectValue(childkey, childNode, valarrrt, mv)
+				if sn != nil {
+					rv.FieldByName(f.Name).Set(*sn)
+				}
+			case reflect.String:
+				v := y.GetBaseValue(childkey)
+				rv.FieldByName(f.Name).Set(reflect.ValueOf(v))
+			case reflect.Int:
+				v := y.GetBaseValue(childkey)
+				if v != "" {
+					v1, _ := strconv.Atoi(v)
+					rv.FieldByName(f.Name).Set(reflect.ValueOf(v1))
+				}
+
+			case reflect.Int64:
+				v := y.GetBaseValue(childkey)
+				if v != "" {
+					v1, _ := strconv.ParseInt(v, 10, 64)
+					rv.FieldByName(f.Name).Set(reflect.ValueOf(v1))
+				}
+			case reflect.Float64:
+				v := y.GetBaseValue(childkey)
+				if v != "" {
+					v1, _ := strconv.ParseFloat(v, 64)
+					rv.FieldByName(f.Name).Set(reflect.ValueOf(v1))
+				}
+			}
+		}
+	case reflect.Ptr:
+		if len(current.Children) == 0 {
+			return nil
+		}
+		// rv不可能为空
+		rv1 := rv.Elem()
+		y.setObjectValue(link, current, rt.Elem(), &rv1)
+	case reflect.Slice:
+		var newValue *reflect.Value = rv
+		if len(current.Children) == 0 {
+			return nil
+		}
+
+		valrt := rt.Elem()
+		for i, childNode := range current.Children {
+			childkey := fmt.Sprintf("%s[%d]", link, i)
+			switch valrt.Kind() {
+			case reflect.Map:
+				valvalrt := valrt.Elem()
+				valmaprt := reflect.MapOf(reflect.TypeOf(""), valvalrt)
+				valmaprv := reflect.MakeMap(valmaprt)
+				y.setObjectValue(childkey, childNode, valmaprt, &valmaprv)
+				sn := reflect.Append(*newValue, valmaprv)
+				newValue = &sn
+			case reflect.Struct:
+				valrv1 := reflect.New(valrt)
+				valrv := valrv1.Elem()
+				y.setObjectValue(childkey, childNode, valrt, &valrv)
+				sn := reflect.Append(*newValue, valrv)
+				newValue = &sn
+			case reflect.Ptr:
+				valrv1 := reflect.New(valrt.Elem())
+				valrv := valrv1.Elem()
+				y.setObjectValue(childkey, childNode, valrt.Elem(), &valrv)
+				sn := reflect.Append(*newValue, valrv1)
+				newValue = &sn
+			case reflect.Slice:
+				valarrrt := reflect.SliceOf(valrt.Elem())
+				valrv1 := reflect.MakeSlice(valarrrt, 0, 0)
+				m1 := y.setObjectValue(childkey, childNode, valarrrt, &valrv1)
+				if m1 != nil {
+					sn := reflect.Append(*newValue, valrv1)
+					newValue = &sn
+				}
+
+			case reflect.String:
+				v := y.GetBaseValue(childkey)
+				//fmt.Println(v)
+				sn := reflect.Append(*newValue, reflect.ValueOf(v))
+				newValue = &sn
+			case reflect.Int:
+				v := y.GetBaseValue(childkey)
+				if v != "" {
+					v1, _ := strconv.Atoi(v)
+					sn := reflect.Append(*newValue, reflect.ValueOf(v1))
+					newValue = &sn
+				}
+
+			case reflect.Int64:
+				v := y.GetBaseValue(childkey)
+				if v != "" {
+					v1, _ := strconv.ParseInt(v, 10, 64)
+					sn := reflect.Append(*newValue, reflect.ValueOf(v1))
+					newValue = &sn
+				}
+			case reflect.Float64:
+				v := y.GetBaseValue(childkey)
+				if v != "" {
+					v1, _ := strconv.ParseFloat(v, 64)
+					sn := reflect.Append(*newValue, reflect.ValueOf(v1))
+					newValue = &sn
+				}
+			}
+		}
+		return newValue
 	}
+	return nil
+}
+
+// GetObjectValue key中不支持数组ƒ√
+func (y *YamlTree) GetObjectValue(key string, val interface{}) {
+
+	var current *YamlNode
+
+	k1 := fmt.Sprintf(".%s", key)
+	if n, ok := y.RefNode[k1]; !ok {
+		return
+	} else {
+		current = n
+	}
+
 	if current == nil || len(current.Children) == 0 {
 		return
 	}
 
-	target := reflect.ValueOf(val).Elem()
-	n := target.Type().NumOut()
-	for i := 0; i < n; i++ {
-		ft := target.Type().Field(i)
-		fv := target.FieldByName(ft.Name)
-		y.setStructValue(current, &ft, &fv)
+	rt := reflect.TypeOf(val)
+	rv := reflect.ValueOf(val)
+	y.setObjectValue(key, current, rt, &rv)
+}
+
+func (y *YamlTree) reIndex1(key string, node *YamlNode, refNode map[string]*YamlNode) {
+	if node == nil {
+		return
 	}
+	if len(node.Children) == 0 {
+		return
+	}
+
+	for key1, child := range node.ChildMap {
+		if node.NodeType == 1 {
+			var k string = fmt.Sprintf("%s[%s]", key, key1)
+			refNode[k] = child
+			y.reIndex1(k, child, refNode)
+		} else {
+			var k string = fmt.Sprintf("%s.%s", key, key1)
+			refNode[k] = child
+			y.reIndex1(k, child, refNode)
+		}
+	}
+}
+
+// ReIndex 当使用MergeTree完之后 都需要调用ReIndex重建RefNode
+func (y *YamlTree) ReIndex() {
+	if y.Root == nil {
+		return
+	}
+	if len(y.Root.Children) == 0 {
+		return
+	}
+	var refNode map[string]*YamlNode = make(map[string]*YamlNode)
+	for key, child := range y.Root.ChildMap {
+		key1 := fmt.Sprintf(".%s", key)
+		refNode[key1] = child
+		y.reIndex1(key1, child, refNode)
+	}
+	y.RefNode = refNode
 }
 
 func (y *YamlTree) MergeTree(target *YamlNode, source *YamlNode) {
@@ -202,8 +447,7 @@ func (y *YamlTree) MergeTree(target *YamlNode, source *YamlNode) {
 		if tarEle, ok := target.ChildMap[k]; !ok {
 			target.Children = append(target.Children, v)
 			target.ChildMap[k] = v
-
-			y.RefNode[v.AliasKey] = v
+			//y.RefNode[v.AliasKey] = v
 		} else {
 			if v.NodeType == 1 {
 				//数组直接替换掉
@@ -225,7 +469,7 @@ func (y *YamlTree) MergeTree(target *YamlNode, source *YamlNode) {
 				target.Children = ret
 				target.ChildMap[k] = v
 
-				y.RefNode[v.AliasKey] = v
+				//y.RefNode[v.AliasKey] = v
 			} else {
 				if len(v.Children) == 0 {
 					tarEle.RowValue = v.RowValue
@@ -570,4 +814,10 @@ func (y *YamlTree) HandleLine(line string, preNode *YamlNode) *YamlNode {
 
 func isContainElexpress(m string) bool {
 	return elReg.Match([]byte(m))
+}
+
+var reg1 *regexp.Regexp = regexp.MustCompile(`\W+`)
+
+func removeSpecialChar(m string) string {
+	return reg1.ReplaceAllString(m, "")
 }

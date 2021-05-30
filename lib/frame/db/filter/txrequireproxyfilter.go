@@ -2,21 +2,21 @@ package filter
 
 import (
 	"fmt"
+	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/db/dbcore"
-	"github.com/dxq174510447/goframe/lib/frame/proxy"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"reflect"
 )
 
 type TxRequireProxyFilter struct {
-	Next proxy.ProxyFilter
 }
 
 func (d *TxRequireProxyFilter) Execute(context *context.LocalStack,
-	classInfo *proxy.ProxyClass,
-	methodInfo *proxy.ProxyMethod,
+	classInfo *proxyclass.ProxyClass,
+	methodInfo *proxyclass.ProxyMethod,
 	invoker *reflect.Value,
-	arg []reflect.Value) []reflect.Value {
+	arg []reflect.Value, next *proxyclass.ProxyFilterWrapper) []reflect.Value {
 
 	fmt.Printf("TxRequireProxyFilter begin \n")
 	defer fmt.Printf("TxRequireProxyFilter end \n")
@@ -35,7 +35,7 @@ func (d *TxRequireProxyFilter) Execute(context *context.LocalStack,
 
 	if addNewConnection {
 		// 开启新的连接
-		con := dbcore.OpenSqlConnection(0)
+		con := dbcore.OpenSqlConnection(context, 0)
 		fmt.Printf("当前线程初始化新的 connectionId %s \n", con.ConnectId)
 
 		// 将当前新的连接放入新的local变量中
@@ -80,32 +80,23 @@ func (d *TxRequireProxyFilter) Execute(context *context.LocalStack,
 		}
 	}
 
-	return d.Next.Execute(context, classInfo, methodInfo, invoker, arg)
-}
-
-func (d *TxRequireProxyFilter) SetNext(next proxy.ProxyFilter) {
-	d.Next = next
+	return next.Execute(context, classInfo, methodInfo, invoker, arg)
 }
 
 func (d *TxRequireProxyFilter) Order() int {
 	return 5
 }
 
-var txRequireProxyFilter TxRequireProxyFilter = TxRequireProxyFilter{}
-
-type TxRequireProxyFilterFactory struct {
-}
-
-func (d *TxRequireProxyFilterFactory) GetInstance(m map[string]interface{}) proxy.ProxyFilter {
-	return proxy.ProxyFilter(&txRequireProxyFilter)
-}
-
-func (d *TxRequireProxyFilterFactory) AnnotationMatch() []string {
+func (d *TxRequireProxyFilter) AnnotationMatch() []string {
 	return []string{dbcore.TransactionRequire}
 }
 
-var txRequireProxyFilterFactory TxRequireProxyFilterFactory = TxRequireProxyFilterFactory{}
+func (d *TxRequireProxyFilter) ProxyTarget() *proxyclass.ProxyClass {
+	return nil
+}
+
+var txRequireProxyFilter TxRequireProxyFilter = TxRequireProxyFilter{}
 
 func init() {
-	proxy.AddProxyFilterFactory(proxy.ProxyFilterFactory(&txRequireProxyFilterFactory))
+	application.AddProxyInstance("", proxyclass.ProxyTarger(&txRequireProxyFilter))
 }

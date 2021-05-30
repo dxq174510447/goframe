@@ -2,7 +2,7 @@ package application
 
 import (
 	"github.com/dxq174510447/goframe/lib/frame/context"
-	"github.com/dxq174510447/goframe/lib/frame/proxy"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"os"
 	"regexp"
 	"strings"
@@ -102,6 +102,10 @@ func (y *ConfigurableEnvironment) Parse(content string) {
 	y.ConfigTree.Parse(content)
 }
 
+func (y *ConfigurableEnvironment) GetObjectValue(key string, target interface{}) {
+	y.ConfigTree.GetObjectValue(key, target)
+}
+
 func (y *ConfigurableEnvironment) GetBaseValue(key string, defaultValue string) string {
 	m := y.ConfigTree.GetBaseValue(key)
 	if m == "" {
@@ -114,9 +118,41 @@ func (y *ConfigurableEnvironment) GetBaseValue(key string, defaultValue string) 
 type FrameLoadInstanceHandler interface {
 
 	// LoadInstance 返回bool 自定义加载返回true 交给框架默认处理返回false
-	LoadInstance(local *context.LocalStack, target proxy.ProxyTarger,
+	LoadInstance(local *context.LocalStack, target *DynamicProxyInstanceNode,
 		application *FrameApplication,
 		applicationContext *FrameApplicationContext) bool
 
 	Order() int
+}
+
+type DynamicProxyLinkedArray struct {
+	FirstElement *DynamicProxyInstanceNode
+
+	ElementMap map[string]*DynamicProxyInstanceNode
+
+	LastElement *DynamicProxyInstanceNode
+}
+
+func (d *DynamicProxyLinkedArray) Push(node *DynamicProxyInstanceNode) {
+	if d.FirstElement == nil {
+		d.FirstElement = node
+	}
+	if d.ElementMap == nil {
+		d.ElementMap = make(map[string]*DynamicProxyInstanceNode)
+	}
+
+	d.ElementMap[node.Id] = node
+
+	if d.LastElement != nil {
+		d.LastElement.Next = node
+	}
+	d.LastElement = node
+}
+
+type DynamicProxyInstanceNode struct {
+	Target proxyclass.ProxyTarger
+
+	Next *DynamicProxyInstanceNode
+
+	Id string
 }

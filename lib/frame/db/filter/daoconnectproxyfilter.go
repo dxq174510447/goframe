@@ -2,21 +2,21 @@ package filter
 
 import (
 	"fmt"
+	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/db/dbcore"
-	"github.com/dxq174510447/goframe/lib/frame/proxy"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"reflect"
 )
 
 type DaoConnectProxyFilter struct {
-	Next proxy.ProxyFilter
 }
 
 func (d *DaoConnectProxyFilter) Execute(context *context.LocalStack,
-	classInfo *proxy.ProxyClass,
-	methodInfo *proxy.ProxyMethod,
+	classInfo *proxyclass.ProxyClass,
+	methodInfo *proxyclass.ProxyMethod,
 	invoker *reflect.Value,
-	arg []reflect.Value) []reflect.Value {
+	arg []reflect.Value, next *proxyclass.ProxyFilterWrapper) []reflect.Value {
 
 	fmt.Printf("DaoConnectProxyFilter begin \n")
 	defer fmt.Printf("DaoConnectProxyFilter end \n")
@@ -28,7 +28,7 @@ func (d *DaoConnectProxyFilter) Execute(context *context.LocalStack,
 	}
 
 	if dbcon == nil {
-		con := dbcore.OpenSqlConnection(0)
+		con := dbcore.OpenSqlConnection(context, 0)
 		fmt.Printf("当前线程未检测到dbconn 初始化之后 connectid %s \n", con.ConnectId)
 
 		context.Push()
@@ -40,32 +40,23 @@ func (d *DaoConnectProxyFilter) Execute(context *context.LocalStack,
 		}()
 	}
 
-	return d.Next.Execute(context, classInfo, methodInfo, invoker, arg)
-}
-
-func (d *DaoConnectProxyFilter) SetNext(next proxy.ProxyFilter) {
-	d.Next = next
+	return next.Execute(context, classInfo, methodInfo, invoker, arg)
 }
 
 func (d *DaoConnectProxyFilter) Order() int {
 	return 15
 }
 
+func (d *DaoConnectProxyFilter) AnnotationMatch() []string {
+	return []string{proxyclass.AnnotationDao}
+}
+
+func (d *DaoConnectProxyFilter) ProxyTarget() *proxyclass.ProxyClass {
+	return nil
+}
+
 var daoConnectProxyFilter DaoConnectProxyFilter = DaoConnectProxyFilter{}
 
-type DaoConnectProxyFilterFactory struct {
-}
-
-func (d *DaoConnectProxyFilterFactory) GetInstance(m map[string]interface{}) proxy.ProxyFilter {
-	return proxy.ProxyFilter(&daoConnectProxyFilter)
-}
-
-func (d *DaoConnectProxyFilterFactory) AnnotationMatch() []string {
-	return []string{proxy.AnnotationDao}
-}
-
-var daoConnectProxyFilterFactory DaoConnectProxyFilterFactory = DaoConnectProxyFilterFactory{}
-
 func init() {
-	proxy.AddProxyFilterFactory(proxy.ProxyFilterFactory(&daoConnectProxyFilterFactory))
+	application.AddProxyInstance("", proxyclass.ProxyTarger(&daoConnectProxyFilter))
 }

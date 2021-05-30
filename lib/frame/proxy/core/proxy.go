@@ -1,8 +1,10 @@
-package proxy
+package core
 
 import (
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/context"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
+	"github.com/dxq174510447/goframe/lib/frame/util"
 	"reflect"
 	"regexp"
 	"sort"
@@ -13,10 +15,10 @@ import (
 
 type methodInvoke struct {
 	target   interface{}
-	clazz    *ProxyClass
-	method   *ProxyMethod
+	clazz    *proxyclass.ProxyClass
+	method   *proxyclass.ProxyMethod
 	invoker  *reflect.Value
-	filters  []ProxyFilter
+	filters  []*proxyclass.ProxyFilterWrapper
 	initLock sync.Mutex
 }
 
@@ -33,7 +35,7 @@ func (m *methodInvoke) initFilter() {
 
 	fmt.Println("初始化")
 
-	var fs []ProxyFilter
+	var fs []proxyclass.ProxyFilter
 	var hasAdd map[string]string = make(map[string]string)
 
 	// method level
@@ -61,21 +63,37 @@ func (m *methodInvoke) initFilter() {
 		}
 	}
 
+	if len(globalFilter) > 0 {
+		fs = append(fs, globalFilter...)
+	}
+
 	if len(fs) > 1 {
 		sort.Slice(fs, func(i, j int) bool {
 			return fs[i].Order() < fs[j].Order()
 		})
 	}
-	l := len(m.filters)
-	for i, f := range m.filters {
+
+	fmt.Println(len(fs))
+	wrapfs := make([]*proxyclass.ProxyFilterWrapper, len(fs), len(fs))
+	for i := 0; i < len(fs); i++ {
+		wrapfs[i] = &proxyclass.ProxyFilterWrapper{
+			Target: fs[i],
+		}
+	}
+
+	l := len(wrapfs)
+	for i, f := range wrapfs {
 		if i == (l - 1) {
 			break
 		}
-		f.SetNext(m.filters[i+1])
+		f.Next = wrapfs[i+1]
 	}
+
+	m.filters = wrapfs
 }
 func (m *methodInvoke) invoke(context *context.LocalStack, args []reflect.Value) []reflect.Value {
 	m.initFilter()
+	//fmt.Println(len(m.filters))
 	for _, r := range m.filters {
 		fmt.Println(reflect.ValueOf(r).Elem().Type().Name())
 	}
@@ -89,8 +107,8 @@ func (m *methodInvoke) invoke(context *context.LocalStack, args []reflect.Value)
 
 func newMethodInvoke(
 	target interface{},
-	clazz *ProxyClass,
-	method *ProxyMethod,
+	clazz *proxyclass.ProxyClass,
+	method *proxyclass.ProxyMethod,
 	invoker *reflect.Value) *methodInvoke {
 	return &methodInvoke{
 		target:  target,
@@ -101,16 +119,19 @@ func newMethodInvoke(
 }
 
 // classProxy 好像没地方用到 key是全路径 GetClassName
-var classProxy map[string]*ProxyClass = make(map[string]*ProxyClass)
+var classProxy map[string]*proxyclass.ProxyClass = make(map[string]*proxyclass.ProxyClass)
 
-var methodFilter map[string][]ProxyFilter = make(map[string][]ProxyFilter)
+var methodFilter map[string][]proxyclass.ProxyFilter = make(map[string][]proxyclass.ProxyFilter)
+
+var globalFilter []proxyclass.ProxyFilter = make([]proxyclass.ProxyFilter, 0, 0)
 
 // AddAopProxyFilter 添加拦截器
-func AddAopProxyFilter(target ProxyFilter) {
-	AddClassProxy(target.(ProxyTarger))
+func AddAopProxyFilter(target proxyclass.ProxyFilter) {
+	AddClassProxy(target.(proxyclass.ProxyTarger))
 
 	match := target.AnnotationMatch()
 	if len(match) == 0 {
+		globalFilter = append(globalFilter, target)
 		return
 	}
 
@@ -118,26 +139,26 @@ func AddAopProxyFilter(target ProxyFilter) {
 		if v, ok := methodFilter[annotation]; ok {
 			methodFilter[annotation] = append(v, target)
 		} else {
-			methodFilter[annotation] = []ProxyFilter{target}
+			methodFilter[annotation] = []proxyclass.ProxyFilter{target}
 		}
 	}
 
 }
 
-func AddClassProxy(target ProxyTarger) {
+func AddClassProxy(target proxyclass.ProxyTarger) {
 	clazz := target.ProxyTarget()
-	clazzName := GetClassName(target)
+	clazzName := util.ClassUtil.GetClassName(target)
 
 	//添加到映射中
 	if clazz == nil {
-		clazz = &ProxyClass{}
+		clazz = &proxyclass.ProxyClass{}
 	}
 	clazz.Target = target
 	clazz.Name = clazzName
 	classProxy[clazzName] = clazz
 
 	//获取对象方法设置
-	methodRef := make(map[string]*ProxyMethod)
+	methodRef := make(map[string]*proxyclass.ProxyMethod)
 	if len(clazz.Methods) != 0 {
 		for _, md := range clazz.Methods {
 			methodRef[md.Name] = md
@@ -156,14 +177,14 @@ func AddClassProxy(target ProxyTarger) {
 }
 
 // 重新设置struct field func 设置代理链
-func proxyStructFuncField(target ProxyTarger,
+func proxyStructFuncField(target proxyclass.ProxyTarger,
 	targetValue *reflect.Value,
 	targetType reflect.Type,
-	targetMethod map[string]*ProxyMethod,
-	currentTarget ProxyTarger,
+	targetMethod map[string]*proxyclass.ProxyMethod,
+	currentTarget proxyclass.ProxyTarger,
 	currentTargetValue *reflect.Value,
 	currentTargetType reflect.Type,
-	currentTargetMethod map[string]*ProxyMethod,
+	currentTargetMethod map[string]*proxyclass.ProxyMethod,
 	field *reflect.StructField) {
 
 	var isproxyfield bool = false
@@ -174,10 +195,10 @@ func proxyStructFuncField(target ProxyTarger,
 		// currentTargetValue is ptr
 		fieldValue := currentTargetValue.Elem().FieldByName(field.Name)
 		fieldType, _ := currentTargetType.FieldByName(field.Name)
-		if pt, ok := fieldValue.Addr().Interface().(ProxyTarger); ok {
+		if pt, ok := fieldValue.Addr().Interface().(proxyclass.ProxyTarger); ok {
 			if m1 := fieldType.Type.NumField(); m1 > 0 {
 
-				methodRef := make(map[string]*ProxyMethod)
+				methodRef := make(map[string]*proxyclass.ProxyMethod)
 				if len(pt.ProxyTarget().Methods) != 0 {
 					for _, md := range pt.ProxyTarget().Methods {
 						methodRef[md.Name] = md
@@ -203,7 +224,7 @@ func proxyStructFuncField(target ProxyTarger,
 	oldCall := reflect.ValueOf(call.Interface())
 
 	methodName := strings.ReplaceAll(field.Name, "_", "")
-	var methodSetting *ProxyMethod
+	var methodSetting *proxyclass.ProxyMethod
 
 	if methodSetting1, ok1 := currentTargetMethod[methodName]; !ok1 {
 		if methodSetting2, ok2 := targetMethod[methodName]; !ok2 {
@@ -213,7 +234,7 @@ func proxyStructFuncField(target ProxyTarger,
 		methodSetting = methodSetting1
 	}
 	if methodSetting == nil {
-		methodSetting = &ProxyMethod{Name: methodName}
+		methodSetting = &proxyclass.ProxyMethod{Name: methodName}
 	}
 
 	invoker := newMethodInvoke(currentTarget, target.ProxyTarget(), methodSetting, &oldCall)
@@ -227,23 +248,6 @@ func proxyStructFuncField(target ProxyTarger,
 		return newCall
 	}(invoker)
 	call.Set(proxyCall)
-}
-
-//GetClassName 用来获取struct的全路径 传递指针
-func GetClassName(target interface{}) string {
-	t := reflect.ValueOf(target).Elem().Type()
-	return fmt.Sprintf("%s/%s", t.PkgPath(), t.Name())
-}
-
-func GetClassNameByType(t reflect.Type) string {
-	return fmt.Sprintf("%s/%s", t.PkgPath(), t.Name())
-}
-
-func NewSingleAnnotation(annotationName string, value map[string]interface{}) *AnnotationClass {
-	return &AnnotationClass{
-		Name:  annotationName,
-		Value: value,
-	}
 }
 
 func getTargetValue(target interface{}, name string) interface{} {

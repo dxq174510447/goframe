@@ -6,7 +6,3 @@ import (
 	_ "github.com/dxq174510447/goframe/lib/frame/http"
 	_ "github.com/dxq174510447/goframe/lib/frame/proxy"
 )
-
-func init() {
-
-}

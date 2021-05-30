@@ -3,7 +3,7 @@ package application
 import (
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/context"
-	"github.com/dxq174510447/goframe/lib/frame/proxy"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/core"
 	"sort"
 	"strings"
 )
@@ -20,6 +20,8 @@ type FrameApplication struct {
 	LoadStrategy []FrameLoadInstanceHandler
 
 	Environment *ConfigurableEnvironment
+
+	FrameResource *ResourcePool
 }
 
 func (a *FrameApplication) AddApplicationContextListener(listener ApplicationContextListener) *FrameApplication {
@@ -95,6 +97,20 @@ func (a *FrameApplication) PrepareEnvironment(local *context.LocalStack,
 
 	// 全局事件
 	listeners.EnvironmentPrepared(local, c)
+
+	c.ConfigTree.ReIndex()
+
+	//var m []string=make([]string,0,len(c.ConfigTree.RefNode))
+	//for k,_ := range c.ConfigTree.RefNode {
+	//	m = append(m,k)
+	//}
+	//sort.Slice(m, func(i, j int) bool {
+	//	return m[i] < m[j]
+	//})
+	//for _,k := range m {
+	//	fmt.Println(k)
+	//}
+
 	return c
 }
 
@@ -107,7 +123,7 @@ func (a *FrameApplication) CreateApplicationContext(local *context.LocalStack) *
 
 // RefreshContext 加载实例
 func (a *FrameApplication) RefreshContext(local *context.LocalStack, applicationContext *FrameApplicationContext) {
-	pl := GetResourcePool().ProxyInsList
+	pl := GetResourcePool().ProxyInsPool
 
 	if len(a.LoadStrategy) > 1 {
 		sort.Slice(a.LoadStrategy, func(i, j int) bool {
@@ -115,23 +131,22 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 		})
 	}
 
-	for _, k := range pl {
-		if k == nil {
-			continue
-		}
-		var add bool = false
+	current := pl.FirstElement
+	for current != nil {
 
+		var add bool = false
 		if len(a.LoadStrategy) > 0 {
 			for _, strategy := range a.LoadStrategy {
-				add = strategy.LoadInstance(local, k, a, applicationContext)
+				add = strategy.LoadInstance(local, current, a, applicationContext)
 				if add {
 					break
 				}
 			}
 		}
 		if !add {
-			proxy.AddClassProxy(k)
+			core.AddClassProxy(current.Target)
 		}
+		current = current.Next
 	}
 }
 
@@ -196,6 +211,7 @@ func NewApplication(main interface{}) *FrameApplication {
 		MainClass:            main,
 		ApplicationListeners: listeners,
 		LoadStrategy:         instanceLoad,
+		FrameResource:        GetResourcePool(),
 	}
 	return app
 }

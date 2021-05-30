@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/exception"
-	"github.com/dxq174510447/goframe/lib/frame/proxy"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/core"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"github.com/dxq174510447/goframe/lib/frame/util"
 	"github.com/dxq174510447/goframe/lib/frame/vo"
 	"io/ioutil"
@@ -15,7 +16,7 @@ import (
 	"strings"
 )
 
-var DefaultServletPath = ""
+var DefaultServConfig *ServerConfig
 
 type RestAnnotationSetting struct {
 
@@ -39,10 +40,10 @@ type RestAnnotationSetting struct {
 }
 
 type ControllerVar struct {
-	Target               proxy.ProxyTarger
+	Target               proxyclass.ProxyTarger
 	PrefixPath           string
-	AbsoluteMethodPath   map[string]*proxy.ProxyMethod
-	NoAbsoluteMethodPath []*proxy.ProxyMethod
+	AbsoluteMethodPath   map[string]*proxyclass.ProxyMethod
+	NoAbsoluteMethodPath []*proxyclass.ProxyMethod
 	NoAbsolutePathTree   *PathNode
 }
 
@@ -52,7 +53,7 @@ type DispatchServlet struct {
 func (d *DispatchServlet) Dispatch(local *context.LocalStack, request *http.Request, response http.ResponseWriter) {
 	controller := GetCurrentControllerInvoker(local)
 
-	var proxyMethod *proxy.ProxyMethod
+	var proxyMethod *proxyclass.ProxyMethod
 	var methodRequestSetting *RestAnnotationSetting
 
 	defer func() {
@@ -199,11 +200,11 @@ func GetDispatchServlet() *DispatchServlet {
 }
 
 // AddControllerProxyTarget 思路是根据path前缀匹配到controller，在根据path和method去匹配controller具体的method
-func AddControllerProxyTarget(target1 proxy.ProxyTarger) {
-	proxy.AddClassProxy(target1)
+func AddControllerProxyTarget(target1 proxyclass.ProxyTarger) {
+	core.AddClassProxy(target1)
 
-	var absoluteMethodPath = make(map[string]*proxy.ProxyMethod)
-	var noAbsoluteMethodPath []*proxy.ProxyMethod
+	var absoluteMethodPath = make(map[string]*proxyclass.ProxyMethod)
+	var noAbsoluteMethodPath []*proxyclass.ProxyMethod
 	var controllerRoot *PathNode = &PathNode{}
 	for _, method := range target1.ProxyTarget().Methods {
 		methodRestSetting := GetRequestAnnotationSetting(method.Annotations)
@@ -312,4 +313,23 @@ func removePrefix(path string, prefix string) string {
 		return r
 	}
 	return path
+}
+
+func GetControllerPathPrefix(dispatchServlet *DispatchServlet, target proxyclass.ProxyTarger) string {
+	//context-path
+	var sp string = ""
+	if DefaultServConfig != nil && DefaultServConfig.Servlet != nil {
+		sp = DefaultServConfig.Servlet.ContextPath
+	}
+	if sp == "/" {
+		sp = ""
+	}
+
+	//controller-path
+	var classRestSetting *RestAnnotationSetting = GetRequestAnnotationSetting(target.ProxyTarget().Annotations)
+	var cp string = classRestSetting.HttpPath
+	if cp == "/" {
+		cp = ""
+	}
+	return fmt.Sprintf("%s%s", sp, cp)
 }

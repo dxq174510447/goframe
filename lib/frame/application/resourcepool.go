@@ -1,31 +1,32 @@
 package application
 
 import (
-	"github.com/dxq174510447/goframe/lib/frame/proxy"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
+	"github.com/dxq174510447/goframe/lib/frame/util"
 	"reflect"
 )
 
 // ResourcePool 资源pool 所有启动加载的资源都放这里 例如配置文件 代理单例
 type ResourcePool struct {
-	ConfigMap    map[string]string
-	ProxyInsMap  map[string]proxy.ProxyTarger
-	ProxyInsList []proxy.ProxyTarger
+	// 配置文件
+	ConfigMap map[string]string
+	// 实例池
+	ProxyInsPool *DynamicProxyLinkedArray
 	// 注入的时候需要检查是否实现的接口
 	RegisterType map[string]reflect.Type
 	// 如果满足上面条件就直接放到一个list分组中
-	RegisterInsMap map[string][]proxy.ProxyTarger
+	RegisterInsMap map[string][]proxyclass.ProxyTarger
 }
 
 func (r *ResourcePool) RegisterInterfaceType(t reflect.Type) {
-	clname := proxy.GetClassNameByType(t)
+	clname := util.ClassUtil.GetClassNameByType(t)
 	r.RegisterType[clname] = t
 }
 
 var resourcePool ResourcePool = ResourcePool{
 	ConfigMap:      make(map[string]string),
-	ProxyInsMap:    make(map[string]proxy.ProxyTarger),
-	ProxyInsList:   make([]proxy.ProxyTarger, 0, 100),
-	RegisterInsMap: make(map[string][]proxy.ProxyTarger),
+	ProxyInsPool:   &DynamicProxyLinkedArray{},
+	RegisterInsMap: make(map[string][]proxyclass.ProxyTarger),
 	RegisterType:   make(map[string]reflect.Type),
 }
 
@@ -38,14 +39,22 @@ func AddConfigYaml(name string, config string) {
 }
 
 // AddProxyInstance name 可以为空 ，默认会设置类名
-func AddProxyInstance(name string, instance proxy.ProxyTarger) {
+func AddProxyInstance(name string, instance proxyclass.ProxyTarger) {
 	var key string = name
-	if key == "" {
-		key = proxy.GetClassName(instance)
+
+	if key == "" && instance.ProxyTarget() != nil && instance.ProxyTarget().Name != "" {
+		key = instance.ProxyTarget().Name
 	}
 
-	resourcePool.ProxyInsMap[key] = instance
-	resourcePool.ProxyInsList = append(resourcePool.ProxyInsList, instance)
+	if key == "" {
+		key = util.ClassUtil.GetClassName(instance)
+	}
+
+	node := &DynamicProxyInstanceNode{
+		Target: instance,
+		Id:     key,
+	}
+	resourcePool.ProxyInsPool.Push(node)
 
 	t := reflect.TypeOf(instance)
 	for k, v := range resourcePool.RegisterType {
@@ -53,7 +62,7 @@ func AddProxyInstance(name string, instance proxy.ProxyTarger) {
 			if as, ok := resourcePool.RegisterInsMap[k]; ok {
 				resourcePool.RegisterInsMap[k] = append(as, instance)
 			} else {
-				resourcePool.RegisterInsMap[k] = []proxy.ProxyTarger{instance}
+				resourcePool.RegisterInsMap[k] = []proxyclass.ProxyTarger{instance}
 			}
 		}
 	}

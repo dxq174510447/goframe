@@ -26,6 +26,7 @@ const (
 	// MapperErrorHandlerFlagKey 上下文中保存mapper错误处理方式 0panic 1 return error
 	MapperErrorHandlerFlagKey = "MapperErrorHandlerFlagKey_"
 	DataBaseTxKey             = "DataBaseTxKey_"
+	DataBaseRouteKey          = "DataBaseRouteKey_"
 )
 
 const (
@@ -37,6 +38,8 @@ const (
 	// dao 中参数配置
 	AnnotationSqlProviderConfig         = "AnnotationSqlProviderConfig_"
 	AnnotationSqlProviderConfigValueKey = "AnnotationSqlProviderConfigValueKey_"
+
+	AnnotationDaoConfigValueKey = "AnnotationDaoConfigValueKey_"
 )
 
 var SqlNullInt32Type reflect.Type = reflect.TypeOf(sql.NullInt32{})
@@ -71,4 +74,16 @@ func GetErrorHandleFlag(local *context.LocalStack) int {
 // SetErrorHandleFlag flag 0 标记panic 1标记 return error
 func SetErrorHandleFlag(local *context.LocalStack, flag int) {
 	local.Set(MapperErrorHandlerFlagKey, flag)
+}
+
+func SetDbRouteKey(local *context.LocalStack, key string) {
+	local.Set(DataBaseRouteKey, key)
+}
+
+func GetDbRouteKey(local *context.LocalStack) string {
+	m := local.Get(DataBaseRouteKey)
+	if m == nil {
+		return DataBaseDefaultKey
+	}
+	return m.(string)
 }

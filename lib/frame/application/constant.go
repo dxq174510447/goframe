@@ -2,7 +2,7 @@ package application
 
 import (
 	"github.com/dxq174510447/goframe/lib/frame/context"
-	"github.com/dxq174510447/goframe/lib/frame/proxy"
+	"github.com/dxq174510447/goframe/lib/frame/util"
 	"reflect"
 )
 
@@ -20,10 +20,10 @@ const (
 )
 
 var ApplicationContextListenerType reflect.Type = reflect.Zero(reflect.TypeOf((*ApplicationContextListener)(nil)).Elem()).Type()
-var ApplicationContextListenerTypeName string = proxy.GetClassNameByType(ApplicationContextListenerType)
+var ApplicationContextListenerTypeName string = util.ClassUtil.GetClassNameByType(ApplicationContextListenerType)
 
 var FrameLoadInstanceHandlerType reflect.Type = reflect.Zero(reflect.TypeOf((*FrameLoadInstanceHandler)(nil)).Elem()).Type()
-var FrameLoadInstanceHandlerTypeName string = proxy.GetClassNameByType(FrameLoadInstanceHandlerType)
+var FrameLoadInstanceHandlerTypeName string = util.ClassUtil.GetClassNameByType(FrameLoadInstanceHandlerType)
 
 func SetEnvironmentToApplication(local *context.LocalStack, env *ConfigurableEnvironment) {
 	local.Set(FrameEnvironmentKey, env)

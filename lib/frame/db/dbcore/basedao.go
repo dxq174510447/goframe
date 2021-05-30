@@ -2,11 +2,11 @@ package dbcore
 
 import (
 	"github.com/dxq174510447/goframe/lib/frame/context"
-	"github.com/dxq174510447/goframe/lib/frame/proxy"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"reflect"
 )
 
-var BaseProxyTarger *proxy.ProxyClass = &proxy.ProxyClass{}
+var BaseProxyTarger *proxyclass.ProxyClass = &proxyclass.ProxyClass{}
 
 type BaseDao struct {
 	Save_   func(local *context.LocalStack, entity interface{}) (int, error)
@@ -41,7 +41,7 @@ func (b *BaseDao) Find(local *context.LocalStack, entity interface{}) ([]interfa
 	return b.Find_(local, entity)
 }
 
-func (b *BaseDao) ProxyTarget() *proxy.ProxyClass {
+func (b *BaseDao) ProxyTarget() *proxyclass.ProxyClass {
 	return BaseProxyTarger
 }
 
