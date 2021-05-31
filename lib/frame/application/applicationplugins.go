@@ -188,25 +188,38 @@ type DynamicProxyInstanceNode struct {
 }
 
 type InsValueInjectTree struct {
-	Root       *InsValueInjectTreeNode
-	RefNode    map[string]*InsValueInjectTreeNode
-	ConfigTree *YamlTree
+	Root        *InsValueInjectTreeNode
+	RefNode     map[string]*InsValueInjectTreeNode
+	Environment *ConfigurableEnvironment
 }
 
-func (i *InsValueInjectTree) GetBaseValue(key string, defaultValue string) string {
+func (i *InsValueInjectTree) getValueFromString(val string, t reflect.Type) *reflect.Value {
+	switch t.Kind() {
+	case reflect.String:
+	}
+}
+func (i *InsValueInjectTree) SetBindValue(
+	target *DynamicProxyInstanceNode,
+	field *reflect.StructField,
+	configkey string,
+	defaultVal string,
+) {
+	var val reflect.Value
+	if configkey != "" {
+		switch field.Type.Kind() {
+		case reflect.Ptr:
+			v := reflect.New(field.Type.Elem())
+			i.Environment.GetObjectValue(configkey, v.Interface())
+		case reflect.Struct:
+			v := reflect.New(field.Type)
+			i.Environment.GetObjectValue(configkey, v.Interface())
+		default:
+			v := i.Environment.GetBaseValue(configkey, defaultVal)
+		}
+	} else {
+		val = reflect.ValueOf(defaultVal)
+	}
 	return ""
-}
-
-func (i *InsValueInjectTree) GetObjectValue(key string, rt reflect.Type) interface{} {
-	return nil
-}
-
-func (i *InsValueInjectTree) SetBaseValue(key string, value string) {
-
-}
-
-func (i *InsValueInjectTree) SetObjectValue(key string, value interface{}) {
-
 }
 
 type InsValueInjectTreeNode struct {

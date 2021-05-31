@@ -11,7 +11,8 @@ import (
 )
 
 type FrameApplicationContext struct {
-	Environment *ConfigurableEnvironment
+	Environment   *ConfigurableEnvironment
+	ValueBindTree *InsValueInjectTree
 }
 
 type FrameApplication struct {
@@ -119,6 +120,11 @@ func (a *FrameApplication) PrepareEnvironment(local *context.LocalStack,
 func (a *FrameApplication) CreateApplicationContext(local *context.LocalStack) *FrameApplicationContext {
 	applicationContext := &FrameApplicationContext{
 		Environment: a.Environment,
+		ValueBindTree: &InsValueInjectTree{
+			Environment: a.Environment,
+			Root:        &InsValueInjectTreeNode{},
+			RefNode:     make(map[string]*InsValueInjectTreeNode),
+		},
 	}
 	return applicationContext
 }
@@ -178,7 +184,23 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 				if key == "" {
 					continue
 				}
-				//
+				var configkey string
+				var configval string
+				if isContainElexpress(key) {
+					b := strings.Index(key, "{")
+					e := strings.LastIndex(key, "}")
+					k1 := key[b+1 : e]
+					d := strings.Index(k1, ":")
+					if d == -1 {
+						configkey = k1
+					} else {
+						configkey = k1[0:d]
+						configval = k1[d+1 : len(k1)]
+					}
+					applicationContext.ValueBindTree.SetBindValue(target, field, configkey, configval)
+				} else {
+					applicationContext.ValueBindTree.SetBindValue(target, field, "", key)
+				}
 			}
 		}
 	}
