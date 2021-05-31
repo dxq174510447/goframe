@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/core"
+	"github.com/dxq174510447/goframe/lib/frame/util"
+	"reflect"
 	"sort"
 	"strings"
 )
@@ -132,6 +134,8 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 	}
 
 	current := pl.FirstElement
+	injectTarget := make([]*DynamicProxyInstanceNode, 0, 30)
+
 	for current != nil {
 
 		var add bool = false
@@ -146,7 +150,37 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 		if !add {
 			core.AddClassProxy(current.Target)
 		}
+
+		if len(current.autowiredInjectField) > 0 || len(current.configInjectField) > 0 {
+			injectTarget = append(injectTarget, current)
+		}
+
 		current = current.Next
+	}
+
+	for _, target := range injectTarget {
+
+		for _, field := range target.autowiredInjectField {
+			if key, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
+				if key == "" {
+					key = util.ClassUtil.GetClassNameByType(field.Type.Elem())
+				}
+				if ele, ok1 := pl.ElementMap[key]; ok1 {
+					if ele.Target != nil {
+						reflect.ValueOf(target.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
+					}
+				}
+			}
+		}
+
+		for _, field := range target.configInjectField {
+			if key, ok := field.Tag.Lookup(ValueInjectKey); ok {
+				if key == "" {
+					continue
+				}
+				//
+			}
+		}
 	}
 }
 

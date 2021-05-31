@@ -4,6 +4,7 @@ import (
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"os"
+	"reflect"
 	"regexp"
 	"strings"
 )
@@ -134,6 +135,26 @@ type DynamicProxyLinkedArray struct {
 }
 
 func (d *DynamicProxyLinkedArray) Push(node *DynamicProxyInstanceNode) {
+
+	if node.Target != nil {
+		target := node.Target
+		node.rt = reflect.TypeOf(target)
+
+		fieldNum := node.rt.Elem().NumField()
+		if fieldNum > 0 {
+			for i := 0; i < fieldNum; i++ {
+				field := node.rt.Elem().Field(i)
+				if _, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
+					node.autowiredInjectField = append(node.autowiredInjectField, &field)
+				}
+
+				if _, ok := field.Tag.Lookup(ValueInjectKey); ok {
+					node.configInjectField = append(node.configInjectField, &field)
+				}
+			}
+		}
+	}
+
 	if d.FirstElement == nil {
 		d.FirstElement = node
 	}
@@ -155,4 +176,45 @@ type DynamicProxyInstanceNode struct {
 	Next *DynamicProxyInstanceNode
 
 	Id string
+
+	// Target 类型 push的时候设置
+	rt reflect.Type
+
+	// push的时候设置
+	configInjectField []*reflect.StructField
+
+	// push的时候设置
+	autowiredInjectField []*reflect.StructField
+}
+
+type InsValueInjectTree struct {
+	Root       *InsValueInjectTreeNode
+	RefNode    map[string]*InsValueInjectTreeNode
+	ConfigTree *YamlTree
+}
+
+func (i *InsValueInjectTree) GetBaseValue(key string, defaultValue string) string {
+	return ""
+}
+
+func (i *InsValueInjectTree) GetObjectValue(key string, rt reflect.Type) interface{} {
+	return nil
+}
+
+func (i *InsValueInjectTree) SetBaseValue(key string, value string) {
+
+}
+
+func (i *InsValueInjectTree) SetObjectValue(key string, value interface{}) {
+
+}
+
+type InsValueInjectTreeNode struct {
+	Key string
+
+	Value     map[string]interface{}
+	BaseValue string
+
+	ChildrenMap map[string]*InsValueInjectTreeNode
+	Children    []*InsValueInjectTreeNode
 }

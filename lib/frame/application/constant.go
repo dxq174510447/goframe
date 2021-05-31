@@ -11,6 +11,11 @@ const (
 )
 
 const (
+	AutowiredInjectKey = "FrameAutowired"
+	ValueInjectKey     = "FrameValue"
+)
+
+const (
 	ApplicationDefaultYaml = "default"
 	ApplicationLocalYaml   = "local"
 	ApplicationDevYaml     = "dev"
