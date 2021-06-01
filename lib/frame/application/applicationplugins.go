@@ -3,9 +3,11 @@ package application
 import (
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
+	"github.com/dxq174510447/goframe/lib/frame/util"
 	"os"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -139,7 +141,7 @@ func (d *DynamicProxyLinkedArray) Push(node *DynamicProxyInstanceNode) {
 	if node.Target != nil {
 		target := node.Target
 		node.rt = reflect.TypeOf(target)
-
+		node.rv = reflect.ValueOf(target)
 		fieldNum := node.rt.Elem().NumField()
 		if fieldNum > 0 {
 			for i := 0; i < fieldNum; i++ {
@@ -180,6 +182,9 @@ type DynamicProxyInstanceNode struct {
 	// Target 类型 push的时候设置
 	rt reflect.Type
 
+	// Target 反射值 push的时候设置
+	rv reflect.Value
+
 	// push的时候设置
 	configInjectField []*reflect.StructField
 
@@ -193,41 +198,201 @@ type InsValueInjectTree struct {
 	Environment *ConfigurableEnvironment
 }
 
-func (i *InsValueInjectTree) getValueFromString(val string, t reflect.Type) *reflect.Value {
+func (i *InsValueInjectTree) SetTreeNode(key string,
+	baseVal string, //基础类型值
+	objectVal interface{}, //对象值 指针
+	node *DynamicProxyInstanceNode,
+	field *reflect.StructField) {
+	if i.Root == nil {
+		i.Root = &InsValueInjectTreeNode{
+			ChildrenMap: make(map[string]*InsValueInjectTreeNode),
+			Children:    make([]*InsValueInjectTreeNode, 0, 5),
+		}
+	}
+	keys := strings.Split(key, ".")
+
+	var current *InsValueInjectTreeNode = i.Root
+	for n := 0; n < len(keys); n++ {
+		k := keys[n]
+		if children, ok := current.ChildrenMap[k]; !ok {
+			child := &InsValueInjectTreeNode{
+				Key:         strings.Join(keys[0:n+1], ","),
+				Value:       make(map[string]interface{}),
+				BaseValue:   "",
+				ChildrenMap: make(map[string]*InsValueInjectTreeNode),
+			}
+			current.Children = append(current.Children, child)
+			current.ChildrenMap[k] = child
+			current = child
+		} else {
+			current = children
+		}
+		if n == (len(keys) - 1) {
+			current.OwnerField = append(current.OwnerField, field)
+			current.OwnerTarget = append(current.OwnerTarget, node)
+			current.BaseValue = baseVal
+			switch field.Type.Kind() {
+			case reflect.Ptr:
+				name := util.ClassUtil.GetClassNameByType(field.Type.Elem())
+
+			case reflect.Struct:
+				name := util.ClassUtil.GetClassNameByType(field.Type.Elem())
+			}
+			current.Value = objectVal
+		}
+	}
+
+}
+func (i *InsValueInjectTree) getValueForType(key string, t reflect.Type) *reflect.Value {
+
+	var node *InsValueInjectTreeNode
+	var ok = false
+	if node, ok = i.RefNode[key]; !ok {
+		return nil
+	}
 	switch t.Kind() {
-	case reflect.String:
+	case reflect.Ptr:
+		name := util.ClassUtil.GetClassNameByType(t.Elem())
+		if v, ok1 := node.Value[name]; ok1 {
+			m := reflect.ValueOf(v)
+			return &m
+		} else {
+			return nil
+		}
+	case reflect.Struct:
+		name := util.ClassUtil.GetClassNameByType(t)
+		if v, ok1 := node.Value[name]; ok1 {
+			m := reflect.ValueOf(v).Elem()
+			return &m
+		} else {
+			return nil
+		}
+	default:
+		v1 := node.BaseValue
+		switch t.Kind() {
+		case reflect.String:
+			v2 := reflect.ValueOf(v1)
+			return &v2
+		case reflect.Int64:
+			if v1 == "" {
+				v1 = "0"
+			}
+			v2, _ := strconv.ParseInt(v1, 10, 64)
+			val1 := reflect.ValueOf(v2)
+			return &val1
+		case reflect.Int:
+			if v1 == "" {
+				v1 = "0"
+			}
+			v2, _ := strconv.Atoi(v1)
+			val1 := reflect.ValueOf(v2)
+			return &val1
+		case reflect.Float64:
+			if v1 == "" {
+				v1 = "0.0"
+			}
+			v2, _ := strconv.ParseFloat(v1, 64)
+			val1 := reflect.ValueOf(v2)
+			return &val1
+		}
 	}
 }
+
+// SetBindValue configkey中不支持数组
 func (i *InsValueInjectTree) SetBindValue(
 	target *DynamicProxyInstanceNode,
 	field *reflect.StructField,
 	configkey string,
 	defaultVal string,
 ) {
-	var val reflect.Value
+	var val *reflect.Value
+
 	if configkey != "" {
-		switch field.Type.Kind() {
-		case reflect.Ptr:
-			v := reflect.New(field.Type.Elem())
-			i.Environment.GetObjectValue(configkey, v.Interface())
-		case reflect.Struct:
-			v := reflect.New(field.Type)
-			i.Environment.GetObjectValue(configkey, v.Interface())
-		default:
-			v := i.Environment.GetBaseValue(configkey, defaultVal)
+		val = i.getValueForType(configkey, field.Type)
+		if val == nil {
+			switch field.Type.Kind() {
+			case reflect.Ptr:
+				v := reflect.New(field.Type.Elem())
+				i.Environment.GetObjectValue(configkey, v.Interface())
+				val = &v
+			case reflect.Struct:
+				v := reflect.New(field.Type)
+				i.Environment.GetObjectValue(configkey, v.Interface())
+				v1 := v.Elem()
+				val = &v1
+			default:
+				v1 := i.Environment.GetBaseValue(configkey, defaultVal)
+				switch field.Type.Kind() {
+				case reflect.String:
+					v2 := reflect.ValueOf(v1)
+					val = &v2
+				case reflect.Int64:
+					if v1 != "" {
+						v2, _ := strconv.ParseInt(v1, 10, 64)
+						val1 := reflect.ValueOf(v2)
+						val = &val1
+					}
+				case reflect.Int:
+					if v1 != "" {
+						v2, _ := strconv.Atoi(v1)
+						val1 := reflect.ValueOf(v2)
+						val = &val1
+					}
+				case reflect.Float64:
+					if v1 != "" {
+						v2, _ := strconv.ParseFloat(v1, 64)
+						val1 := reflect.ValueOf(v2)
+						val = &val1
+					}
+				}
+			}
+			//AddTreeNode
+			i.AddTreeNode(target, field, key, val)
 		}
 	} else {
-		val = reflect.ValueOf(defaultVal)
+		switch field.Type.Kind() {
+		case reflect.String:
+			val1 := reflect.ValueOf(defaultVal)
+			val = &val1
+		case reflect.Int64:
+			if defaultVal != "" {
+				v2, _ := strconv.ParseInt(defaultVal, 10, 64)
+				val1 := reflect.ValueOf(v2)
+				val = &val1
+			}
+		case reflect.Int:
+			if defaultVal != "" {
+				v2, _ := strconv.Atoi(defaultVal)
+				val1 := reflect.ValueOf(v2)
+				val = &val1
+			}
+		case reflect.Float64:
+			if defaultVal != "" {
+				v2, _ := strconv.ParseFloat(defaultVal, 64)
+				val1 := reflect.ValueOf(v2)
+				val = &val1
+			}
+		}
 	}
-	return ""
+	if val != nil {
+		target.rv.FieldByName(field.Name).Set(*val)
+	}
 }
 
 type InsValueInjectTreeNode struct {
+	// key 关键字
 	Key string
 
-	Value     map[string]interface{}
+	// 对象值都是指针struct结构
+	Value map[string]interface{}
+
+	// 基础值都是string类型
 	BaseValue string
 
 	ChildrenMap map[string]*InsValueInjectTreeNode
 	Children    []*InsValueInjectTreeNode
+
+	// 有哪些字段绑定了这个关键字 target和field是一一对应的
+	OwnerTarget []*DynamicProxyInstanceNode
+	OwnerField  []*reflect.StructField
 }
