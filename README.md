@@ -16,6 +16,7 @@
 ### mvc(springboot)
 
 #### 支持yaml配置文件
+1. 支持将配置文件里面的值直接注入到实例中（支持map，指针struct，和基础类型 类似spring value注解的用法）
 见demo configyml.go，localconfigyml.go 类似spring的配置，可以注入到容器实例中，或者从环境中获取
 
 #### 支持http filter
