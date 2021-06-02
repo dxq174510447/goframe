@@ -179,10 +179,10 @@ type DynamicProxyInstanceNode struct {
 
 	Id string
 
-	// Target 类型 push的时候设置
+	// Target 类型 push的时候设置  里面的值都是指针
 	rt reflect.Type
 
-	// Target 反射值 push的时候设置
+	// Target 反射值 push的时候设置 里面的值都是指针
 	rv reflect.Value
 
 	// push的时候设置
@@ -202,7 +202,8 @@ func (i *InsValueInjectTree) SetTreeNode(key string,
 	baseVal string, //基础类型值
 	objectVal interface{}, //对象值 指针
 	node *DynamicProxyInstanceNode,
-	field *reflect.StructField) {
+	field *reflect.StructField,
+	defaultVal string) {
 	if i.Root == nil {
 		i.Root = &InsValueInjectTreeNode{
 			ChildrenMap: make(map[string]*InsValueInjectTreeNode),
@@ -217,32 +218,41 @@ func (i *InsValueInjectTree) SetTreeNode(key string,
 		if children, ok := current.ChildrenMap[k]; !ok {
 			child := &InsValueInjectTreeNode{
 				Key:         strings.Join(keys[0:n+1], ","),
-				Value:       make(map[string]interface{}),
+				ObjectValue: make(map[string]interface{}),
 				BaseValue:   "",
 				ChildrenMap: make(map[string]*InsValueInjectTreeNode),
 			}
 			current.Children = append(current.Children, child)
 			current.ChildrenMap[k] = child
+			i.RefNode[child.Key] = child
 			current = child
 		} else {
 			current = children
 		}
+
 		if n == (len(keys) - 1) {
 			current.OwnerField = append(current.OwnerField, field)
 			current.OwnerTarget = append(current.OwnerTarget, node)
 			current.BaseValue = baseVal
+			current.DefaultValue = defaultVal
 			switch field.Type.Kind() {
+			case reflect.Map:
+				// 先不管吧
+				current.MapValue = append(current.MapValue, objectVal)
 			case reflect.Ptr:
 				name := util.ClassUtil.GetClassNameByType(field.Type.Elem())
-
+				current.ObjectValue[name] = objectVal
 			case reflect.Struct:
-				name := util.ClassUtil.GetClassNameByType(field.Type.Elem())
+				name := util.ClassUtil.GetClassNameByType(field.Type)
+				current.ObjectValue[name] = objectVal
 			}
-			current.Value = objectVal
 		}
 	}
 
 }
+
+// getValueForType 只有struct ptr-struct base缓存（每次设置的时候检查之前有没有生成过，如果有的话就用之前的）
+// map结构每次都重新生成
 func (i *InsValueInjectTree) getValueForType(key string, t reflect.Type) *reflect.Value {
 
 	var node *InsValueInjectTreeNode
@@ -251,9 +261,11 @@ func (i *InsValueInjectTree) getValueForType(key string, t reflect.Type) *reflec
 		return nil
 	}
 	switch t.Kind() {
+	case reflect.Map:
+		return nil
 	case reflect.Ptr:
 		name := util.ClassUtil.GetClassNameByType(t.Elem())
-		if v, ok1 := node.Value[name]; ok1 {
+		if v, ok1 := node.ObjectValue[name]; ok1 {
 			m := reflect.ValueOf(v)
 			return &m
 		} else {
@@ -261,7 +273,7 @@ func (i *InsValueInjectTree) getValueForType(key string, t reflect.Type) *reflec
 		}
 	case reflect.Struct:
 		name := util.ClassUtil.GetClassNameByType(t)
-		if v, ok1 := node.Value[name]; ok1 {
+		if v, ok1 := node.ObjectValue[name]; ok1 {
 			m := reflect.ValueOf(v).Elem()
 			return &m
 		} else {
@@ -296,6 +308,7 @@ func (i *InsValueInjectTree) getValueForType(key string, t reflect.Type) *reflec
 			return &val1
 		}
 	}
+	return nil
 }
 
 // SetBindValue configkey中不支持数组
@@ -310,18 +323,30 @@ func (i *InsValueInjectTree) SetBindValue(
 	if configkey != "" {
 		val = i.getValueForType(configkey, field.Type)
 		if val == nil {
+			var baseVal string
+			var objectVal interface{} // ptr
 			switch field.Type.Kind() {
+			case reflect.Map:
+				//valvalrt := valrt.Elem()
+				valmaprt := reflect.MapOf(reflect.TypeOf(""), field.Type.Elem())
+				valmaprv := reflect.MakeMap(valmaprt)
+				i.Environment.GetObjectValue(configkey, valmaprv.Interface())
+				objectVal = valmaprv.Interface()
+				val = &valmaprv
 			case reflect.Ptr:
 				v := reflect.New(field.Type.Elem())
 				i.Environment.GetObjectValue(configkey, v.Interface())
+				objectVal = v.Interface()
 				val = &v
 			case reflect.Struct:
 				v := reflect.New(field.Type)
 				i.Environment.GetObjectValue(configkey, v.Interface())
+				objectVal = v.Interface()
 				v1 := v.Elem()
 				val = &v1
 			default:
 				v1 := i.Environment.GetBaseValue(configkey, defaultVal)
+				baseVal = v1
 				switch field.Type.Kind() {
 				case reflect.String:
 					v2 := reflect.ValueOf(v1)
@@ -347,7 +372,12 @@ func (i *InsValueInjectTree) SetBindValue(
 				}
 			}
 			//AddTreeNode
-			i.AddTreeNode(target, field, key, val)
+			i.SetTreeNode(configkey,
+				baseVal,   //基础类型值
+				objectVal, //对象值 指针
+				target,
+				field,
+				defaultVal)
 		}
 	} else {
 		switch field.Type.Kind() {
@@ -375,7 +405,7 @@ func (i *InsValueInjectTree) SetBindValue(
 		}
 	}
 	if val != nil {
-		target.rv.FieldByName(field.Name).Set(*val)
+		target.rv.Elem().FieldByName(field.Name).Set(*val)
 	}
 }
 
@@ -384,10 +414,16 @@ type InsValueInjectTreeNode struct {
 	Key string
 
 	// 对象值都是指针struct结构
-	Value map[string]interface{}
+	ObjectValue map[string]interface{}
+
+	// 对象如果是map类型
+	MapValue []interface{}
 
 	// 基础值都是string类型
 	BaseValue string
+
+	// 默认值
+	DefaultValue string
 
 	ChildrenMap map[string]*InsValueInjectTreeNode
 	Children    []*InsValueInjectTreeNode

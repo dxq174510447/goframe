@@ -122,7 +122,6 @@ func (a *FrameApplication) CreateApplicationContext(local *context.LocalStack) *
 		Environment: a.Environment,
 		ValueBindTree: &InsValueInjectTree{
 			Environment: a.Environment,
-			Root:        &InsValueInjectTreeNode{},
 			RefNode:     make(map[string]*InsValueInjectTreeNode),
 		},
 	}
