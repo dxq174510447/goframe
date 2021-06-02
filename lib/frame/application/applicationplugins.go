@@ -217,7 +217,7 @@ func (i *InsValueInjectTree) SetTreeNode(key string,
 		k := keys[n]
 		if children, ok := current.ChildrenMap[k]; !ok {
 			child := &InsValueInjectTreeNode{
-				Key:         strings.Join(keys[0:n+1], ","),
+				Key:         strings.Join(keys[0:n+1], "."),
 				ObjectValue: make(map[string]interface{}),
 				BaseValue:   "",
 				ChildrenMap: make(map[string]*InsValueInjectTreeNode),
@@ -254,9 +254,9 @@ func (i *InsValueInjectTree) SetTreeNode(key string,
 // getValueForType 只有struct ptr-struct base缓存（每次设置的时候检查之前有没有生成过，如果有的话就用之前的）
 // map结构每次都重新生成
 func (i *InsValueInjectTree) getValueForType(key string, t reflect.Type) *reflect.Value {
-
 	var node *InsValueInjectTreeNode
 	var ok = false
+
 	if node, ok = i.RefNode[key]; !ok {
 		return nil
 	}
@@ -265,6 +265,7 @@ func (i *InsValueInjectTree) getValueForType(key string, t reflect.Type) *reflec
 		return nil
 	case reflect.Ptr:
 		name := util.ClassUtil.GetClassNameByType(t.Elem())
+
 		if v, ok1 := node.ObjectValue[name]; ok1 {
 			m := reflect.ValueOf(v)
 			return &m
