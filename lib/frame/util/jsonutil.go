@@ -1,6 +1,9 @@
 package util
 
-import "github.com/dxq174510447/goframe/lib/frame/vo"
+import (
+	"encoding/json"
+	"github.com/dxq174510447/goframe/lib/frame/vo"
+)
 
 type jsonUtil struct {
 }
@@ -51,6 +54,14 @@ func (c *jsonUtil) BuildJsonArraySuccess(r interface{}, total int) *vo.JsonResul
 	result.Data = info
 
 	return &result
+}
+
+func (c *jsonUtil) To2String(r interface{}) string {
+	result, er := json.Marshal(r)
+	if er != nil {
+		panic(er)
+	}
+	return string(result)
 }
 
 var JsonUtil jsonUtil = jsonUtil{}

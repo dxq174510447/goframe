@@ -10,6 +10,8 @@ package logclass
 
 type LogAppender interface {
 	Append(row interface{})
+
+	GetLogLayouter() LogLayouter
 }
 
 type LogLayouter interface {
@@ -26,4 +28,41 @@ type LoggerConfig struct {
 	Additivity bool
 
 	Appender []LogAppender
+
+	Parent *LoggerConfig
+
+	Children []*LoggerConfig
+}
+
+type LogXmlEle struct {
+	Appender []*LogAppenderXmlEle `xml:"appender"`
+
+	Logger []*LogLoggerXmlEle `xml:"logger"`
+
+	Root *LogRootXmlEle `xml:"root"`
+}
+
+type LogAppenderEncodeXmlEle struct {
+	Pattern string `xml:"pattern"`
+}
+type LogAppenderXmlEle struct {
+	Name    string                     `xml:"name,attr"`
+	Clazz   string                     `xml:"class,attr"`
+	Encoder []*LogAppenderEncodeXmlEle `xml:"encoder"`
+}
+
+type LogAppenderRefXmlEle struct {
+	Ref string `xml:"ref,attr"`
+}
+
+type LogLoggerXmlEle struct {
+	Name        string                  `xml:"name,attr"`
+	Level       string                  `xml:"level,attr"`
+	Additivity  bool                    `xml:"additivity,attr"`
+	AppenderRef []*LogAppenderRefXmlEle `xml:"appender-ref"`
+}
+
+type LogRootXmlEle struct {
+	Level       string                  `xml:"level,attr"`
+	AppenderRef []*LogAppenderRefXmlEle `xml:"appender-ref"`
 }
