@@ -1,4 +1,10 @@
 package logcore
 
-type LogWrite struct {
+type ConsoleAppenderImpl struct {
+}
+
+type FileAppenderImpl struct {
+}
+
+type RollingFileAppenderImp struct {
 }

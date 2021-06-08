@@ -11,6 +11,11 @@ import (
 	"strings"
 )
 
+type ProxyInstanceAdapter interface {
+	// AdapterKey 返回长度1-2个
+	AdapterKey() []string
+}
+
 type ApplicationContextListener interface {
 	Starting(local *context.LocalStack)
 
@@ -96,6 +101,10 @@ func (d *DefaultApplicationArguments) GetByName(key string, defaultValue string)
 type ConfigurableEnvironment struct {
 	ConfigTree *YamlTree
 	AppArgs    *DefaultApplicationArguments
+}
+
+func (y *ConfigurableEnvironment) ProxyTarget() *proxyclass.ProxyClass {
+	return nil
 }
 
 func (y *ConfigurableEnvironment) Parse(content string) {

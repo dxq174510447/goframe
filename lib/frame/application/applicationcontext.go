@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/core"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"github.com/dxq174510447/goframe/lib/frame/util"
 	"reflect"
 	"sort"
@@ -13,6 +14,64 @@ import (
 type FrameApplicationContext struct {
 	Environment   *ConfigurableEnvironment
 	ValueBindTree *InsValueInjectTree
+	AdapterMap    map[string]map[string]*DynamicProxyInstanceNode
+	FrameResource *ResourcePool
+}
+
+func (f *FrameApplicationContext) ProxyTarget() *proxyclass.ProxyClass {
+	return nil
+}
+
+// GetProxyInsByInterfaceType t需要是接口type，并且使用RegisterInterfaceType注入过
+func (f *FrameApplicationContext) GetProxyInsByInterfaceType(t reflect.Type) []proxyclass.ProxyTarger {
+	name := util.ClassUtil.GetClassNameByType(t)
+	targets := make([]proxyclass.ProxyTarger, 0, 0)
+	if arr, ok := f.FrameResource.RegisterInsMap[name]; ok {
+		for _, a := range arr {
+			targets = append(targets, a.Target)
+		}
+	}
+	return targets
+}
+
+func (f *FrameApplicationContext) GetProxyInsById(id string) proxyclass.ProxyTarger {
+	if result, ok := f.FrameResource.ProxyInsPool.ElementMap[id]; !ok {
+		return nil
+	} else {
+		return result.Target
+	}
+}
+
+func (f *FrameApplicationContext) GetProxyInsByAdapterKey(groupName string, groupKey string) proxyclass.ProxyTarger {
+	if _, ok := f.AdapterMap[groupName]; !ok {
+		return nil
+	}
+	groups := f.AdapterMap[groupName]
+	if result, ok := groups[groupKey]; !ok {
+		return nil
+	} else {
+		return result.Target
+	}
+}
+
+func (f *FrameApplicationContext) GetProxyInsByAdapterGroup(groupName string) []proxyclass.ProxyTarger {
+	if _, ok := f.AdapterMap[groupName]; !ok {
+		return nil
+	}
+	siz := len(f.AdapterMap[groupName])
+	result := make([]proxyclass.ProxyTarger, 0, siz)
+
+	for _, v := range f.AdapterMap[groupName] {
+		result = append(result, v.Target)
+	}
+	return result
+}
+
+func (f *FrameApplicationContext) SetProxyInsByAdapter(groupName string, groupKey string, target *DynamicProxyInstanceNode) {
+	if _, ok := f.AdapterMap[groupName]; !ok {
+		f.AdapterMap[groupName] = make(map[string]*DynamicProxyInstanceNode)
+	}
+	f.AdapterMap[groupName][groupKey] = target
 }
 
 type FrameApplication struct {
@@ -92,6 +151,8 @@ func (a *FrameApplication) PrepareEnvironment(local *context.LocalStack,
 			AppArgs:    appArgs,
 		}
 		SetEnvironmentToApplication(local, c)
+
+		AddProxyInstance("", proxyclass.ProxyTarger(c))
 	}
 	a.Environment = c
 
@@ -124,7 +185,10 @@ func (a *FrameApplication) CreateApplicationContext(local *context.LocalStack) *
 			Environment: a.Environment,
 			RefNode:     make(map[string]*InsValueInjectTreeNode),
 		},
+		AdapterMap:    make(map[string]map[string]*DynamicProxyInstanceNode),
+		FrameResource: a.FrameResource,
 	}
+	AddProxyInstance("", proxyclass.ProxyTarger(applicationContext))
 	return applicationContext
 }
 
@@ -158,6 +222,19 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 
 		if len(current.autowiredInjectField) > 0 || len(current.configInjectField) > 0 {
 			injectTarget = append(injectTarget, current)
+		}
+
+		if f, ok := current.Target.(ProxyInstanceAdapter); ok {
+			adapterKey := f.AdapterKey()
+			if len(adapterKey) == 0 {
+				continue
+			}
+			groupName := adapterKey[0]
+			groupKey := current.Id
+			if len(adapterKey) > 1 {
+				groupKey = adapterKey[1]
+			}
+			applicationContext.SetProxyInsByAdapter(groupName, groupKey, current)
 		}
 
 		current = current.Next
@@ -251,14 +328,14 @@ func NewApplication(main interface{}) *FrameApplication {
 	listeners := make([]ApplicationContextListener, 0, 0)
 	if arr, ok := GetResourcePool().RegisterInsMap[ApplicationContextListenerTypeName]; ok {
 		for _, a := range arr {
-			listeners = append(listeners, a.(ApplicationContextListener))
+			listeners = append(listeners, a.Target.(ApplicationContextListener))
 		}
 	}
 
 	instanceLoad := make([]FrameLoadInstanceHandler, 0, 0)
 	if arr, ok := GetResourcePool().RegisterInsMap[FrameLoadInstanceHandlerTypeName]; ok {
 		for _, a := range arr {
-			instanceLoad = append(instanceLoad, a.(FrameLoadInstanceHandler))
+			instanceLoad = append(instanceLoad, a.Target.(FrameLoadInstanceHandler))
 		}
 	}
 
