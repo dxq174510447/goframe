@@ -9,9 +9,8 @@ package logclass
 // appender 是往上叠加的
 
 type LogAppender interface {
-	Append(row interface{})
-
-	GetLogLayouter() LogLayouter
+	AppenderKey() string
+	NewAppender(ele *LogAppenderXmlEle) LogAppender
 }
 
 type LogLayouter interface {
@@ -21,8 +20,6 @@ type LoggerConfig struct {
 	Name string
 	// 等级 TRACE, DEBUG, INFO, WARN and ERROR
 	Level string
-	// 是否从上层继承的 默认true
-	Extended bool
 
 	// appender 是否往上累加 默认true
 	Additivity bool
@@ -32,6 +29,8 @@ type LoggerConfig struct {
 	Parent *LoggerConfig
 
 	Children []*LoggerConfig
+
+	ChildrenMap map[string]*LoggerConfig
 }
 
 type LogXmlEle struct {
@@ -39,7 +38,7 @@ type LogXmlEle struct {
 
 	Logger []*LogLoggerXmlEle `xml:"logger"`
 
-	Root *LogRootXmlEle `xml:"root"`
+	Root *LogLoggerXmlEle `xml:"root"`
 }
 
 type LogAppenderEncodeXmlEle struct {
@@ -58,11 +57,6 @@ type LogAppenderRefXmlEle struct {
 type LogLoggerXmlEle struct {
 	Name        string                  `xml:"name,attr"`
 	Level       string                  `xml:"level,attr"`
-	Additivity  bool                    `xml:"additivity,attr"`
-	AppenderRef []*LogAppenderRefXmlEle `xml:"appender-ref"`
-}
-
-type LogRootXmlEle struct {
-	Level       string                  `xml:"level,attr"`
+	Additivity  string                  `xml:"additivity,attr"`
 	AppenderRef []*LogAppenderRefXmlEle `xml:"appender-ref"`
 }

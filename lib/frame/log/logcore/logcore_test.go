@@ -40,7 +40,7 @@ var m1 string = `
     </encoder>
   </appender>
   
-  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+  <appender name="CONSOLE" class="console">
     <encoder>
       <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
     </encoder>
@@ -56,6 +56,7 @@ var m1 string = `
 	</logger>
   
   <logger name="org.mybatis" level="ERROR"/>
+	<logger name="org.mybatis.framework.sql" level="ERROR"/>
   <logger name="org.springframework" level="ERROR"/>
   <logger name="org.quartz" level="ERROR"/>
   <logger name="org.apache" level="ERROR"/>
