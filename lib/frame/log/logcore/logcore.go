@@ -13,6 +13,16 @@ import (
 	"text/template"
 )
 
+// Release lock while getting caller info - it's expensive.
+//l.mu.Unlock()
+//var ok bool
+//_, file, line, ok = runtime.Caller(calldepth)
+//if !ok {
+//file = "???"
+//  line = 0
+//}
+//l.mu.Lock()
+
 type ConsoleAppenderImpl struct {
 	Pattern string
 }
