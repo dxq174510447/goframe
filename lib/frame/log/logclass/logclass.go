@@ -9,6 +9,7 @@ package logclass
 // appender 是往上叠加的
 
 type LogAppender interface {
+	AppendRow(row string)
 	AppenderKey() string
 	NewAppender(ele *LogAppenderXmlEle) LogAppender
 }
@@ -19,7 +20,11 @@ type LogLayouter interface {
 type LoggerConfig struct {
 	Name string
 	// 等级 TRACE, DEBUG, INFO, WARN and ERROR
+	// 设置的时候 转大写
 	Level string
+
+	// level是否是继承的 0不是继承 1是继承
+	Extended int
 
 	// appender 是否往上累加 默认true
 	Additivity bool

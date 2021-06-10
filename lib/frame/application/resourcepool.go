@@ -10,6 +10,8 @@ import (
 type ResourcePool struct {
 	// 配置文件
 	ConfigMap map[string]string
+	// 日志配置文件
+	LogConfigMap map[string]string
 	// 实例池
 	ProxyInsPool *DynamicProxyLinkedArray
 	// 注入的时候需要检查是否实现的接口
@@ -25,6 +27,7 @@ func (r *ResourcePool) RegisterInterfaceType(t reflect.Type) {
 
 var resourcePool ResourcePool = ResourcePool{
 	ConfigMap:      make(map[string]string),
+	LogConfigMap:   make(map[string]string),
 	ProxyInsPool:   &DynamicProxyLinkedArray{},
 	RegisterInsMap: make(map[string][]*DynamicProxyInstanceNode),
 	RegisterType:   make(map[string]reflect.Type),
@@ -39,6 +42,13 @@ func GetResourcePool() *ResourcePool {
 // 加载规则，默认加载default,然后从启动项或者环境变量中获取spring.profiles.active，如果获取到就加载，获取不到就加载local
 func AddConfigYaml(name string, config string) {
 	resourcePool.ConfigMap[name] = config
+}
+
+// AddAppLogConfig 初始化添加全局配置文件内容
+//  name 配置关键字 ，例如 ApplicationDefaultYaml
+// 加载规则，默认加载default,然后从启动项或者环境变量中获取spring.profiles.active，如果获取到就加载，获取不到就加载local
+func AddAppLogConfig(name string, config string) {
+	resourcePool.LogConfigMap[name] = config
 }
 
 // RegisterInterfaceType 接口类型 可以见RegisterInterfaceType(ApplicationContextListenerType)
@@ -81,4 +91,5 @@ func init() {
 	// 默认添加
 	resourcePool.RegisterInterfaceType(ApplicationContextListenerType)
 	resourcePool.RegisterInterfaceType(FrameLoadInstanceHandlerType)
+	resourcePool.RegisterInterfaceType(FrameLogFactoryerType)
 }

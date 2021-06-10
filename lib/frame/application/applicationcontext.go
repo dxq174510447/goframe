@@ -16,6 +16,7 @@ type FrameApplicationContext struct {
 	ValueBindTree *InsValueInjectTree
 	AdapterMap    map[string]map[string]*DynamicProxyInstanceNode
 	FrameResource *ResourcePool
+	LogFactory    AppLogFactoryer
 }
 
 func (f *FrameApplicationContext) ProxyTarget() *proxyclass.ProxyClass {
@@ -84,6 +85,8 @@ type FrameApplication struct {
 	Environment *ConfigurableEnvironment
 
 	FrameResource *ResourcePool
+
+	LogFactory AppLogFactoryer
 }
 
 func (a *FrameApplication) AddApplicationContextListener(listener ApplicationContextListener) *FrameApplication {
@@ -129,6 +132,9 @@ func (a *FrameApplication) Run(args []string) *FrameApplicationContext {
 
 	// 准备上下文环境
 	a.PrepareEnvironment(local, listeners, appArg)
+
+	// 初始化日志
+	a.PrepareLogFactory(local)
 
 	context = a.CreateApplicationContext(local)
 
@@ -187,6 +193,7 @@ func (a *FrameApplication) CreateApplicationContext(local *context.LocalStack) *
 		},
 		AdapterMap:    make(map[string]map[string]*DynamicProxyInstanceNode),
 		FrameResource: a.FrameResource,
+		LogFactory:    a.LogFactory,
 	}
 	AddProxyInstance("", proxyclass.ProxyTarger(applicationContext))
 	return applicationContext
@@ -323,6 +330,33 @@ func (a *FrameApplication) ConfigureEnvironment(local *context.LocalStack,
 
 }
 
+func (a *FrameApplication) PrepareLogFactory(local *context.LocalStack) {
+	if a.LogFactory == nil {
+		return
+	}
+
+	// 加载系统默认配置文件
+	files := make([]string, 0, 0)
+	files = append(files, ApplicationDefaultYaml)
+	activeFile := a.Environment.GetBaseValue("spring.profiles.active", "")
+	if activeFile != "" {
+		fs := strings.Split(activeFile, ",")
+		files = append(files, fs...)
+	} else {
+		files = append(files, ApplicationLocalYaml)
+	}
+
+	funcMap := a.Environment.GetTplFuncMap()
+	for _, f := range files {
+		if c, ok := GetResourcePool().LogConfigMap[f]; ok {
+			fmt.Printf(" 加载日志配置文件 %s\n", f)
+			a.LogFactory.Parse(c, funcMap)
+		} else {
+			fmt.Printf(" 日志配置文件不存在资源中 %s\n", f)
+		}
+	}
+}
+
 func NewApplication(main interface{}) *FrameApplication {
 
 	listeners := make([]ApplicationContextListener, 0, 0)
@@ -339,11 +373,19 @@ func NewApplication(main interface{}) *FrameApplication {
 		}
 	}
 
+	var logFactory AppLogFactoryer
+	if arr, ok := GetResourcePool().RegisterInsMap[FrameLogFactoryerTypeName]; ok {
+		if len(arr) > 0 {
+			logFactory = arr[0].Target.(AppLogFactoryer)
+		}
+	}
+
 	app := &FrameApplication{
 		MainClass:            main,
 		ApplicationListeners: listeners,
 		LoadStrategy:         instanceLoad,
 		FrameResource:        GetResourcePool(),
+		LogFactory:           logFactory,
 	}
 	return app
 }

@@ -9,7 +9,38 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"text/template"
 )
+
+type AppLogFactoryer interface {
+	Parse(content string, funcMap template.FuncMap)
+
+	GetLoggerType(p reflect.Type) AppLoger
+
+	GetLoggerString(className string) AppLoger
+}
+
+type AppLoger interface {
+	Trace(format string, a ...interface{})
+
+	IsTraceEnable() bool
+
+	Debug(format string, a ...interface{})
+
+	IsDebugEnable() bool
+
+	Info(format string, a ...interface{})
+
+	IsInfoEnable() bool
+
+	Warn(format string, a ...interface{})
+
+	IsWarnEnable() bool
+
+	Error(err error, format string, a ...interface{})
+
+	IsErrorEnable() bool
+}
 
 type ProxyInstanceAdapter interface {
 	// AdapterKey 返回长度1-2个
@@ -101,6 +132,14 @@ func (d *DefaultApplicationArguments) GetByName(key string, defaultValue string)
 type ConfigurableEnvironment struct {
 	ConfigTree *YamlTree
 	AppArgs    *DefaultApplicationArguments
+}
+
+func (y *ConfigurableEnvironment) GetTplFuncMap() template.FuncMap {
+	return template.FuncMap{
+		"env": func(key string, defaultValue string) string {
+			return y.GetBaseValue(key, defaultValue)
+		},
+	}
 }
 
 func (y *ConfigurableEnvironment) ProxyTarget() *proxyclass.ProxyClass {
