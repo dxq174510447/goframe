@@ -5,10 +5,13 @@ import (
 	"encoding/xml"
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/application"
+	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/log/logclass"
 	"github.com/dxq174510447/goframe/lib/frame/util"
 	"os"
 	"reflect"
+	"regexp"
+	"strconv"
 	"strings"
 	"text/template"
 )
@@ -22,9 +25,165 @@ import (
 //  line = 0
 //}
 //l.mu.Lock()
+var date1 = regexp.MustCompile("%date(\\{[^\\}]+\\})?")
+var thread1 = regexp.MustCompile("%(\\-\\d+)?thread")
+var level1 = regexp.MustCompile("%(\\-\\d+)?level")
+var line1 = regexp.MustCompile("%(\\-\\d+)?line")
+var file1 = regexp.MustCompile("%(\\-\\d+)?file")
+var msg1 = regexp.MustCompile("%(\\-\\d+)?msg")
+var br = regexp.MustCompile("%(\\-\\d+)?n")
+var logger1 = regexp.MustCompile("%(\\-\\d+)?logger(\\{[^\\}]+\\})?")
+
+// %date %date{HH:mm:ss.SSS} %{-n}thread %{-n}level %logger{n} %line %file %msg %n
+type PatternLayout struct {
+	Pattern         string
+	HasRuntimeParam bool
+	Tpl             *template.Template
+}
+
+func (p *PatternLayout) DoLayout(local *context.LocalStack, config *logclass.LoggerConfig, row string, err error) string {
+	return ""
+}
+
+var layOutFuncMap = template.FuncMap{
+	"logDate": func(format string) string {
+		return util.DateUtil.FormatNowByType(format)
+	},
+	"logThread": func(size int) string {
+		return ""
+	},
+	"logLevel": func(size int) string {
+		return ""
+	},
+	"logLine": func(size int) string {
+		return ""
+	},
+	"logFile": func(size int) string {
+		return ""
+	},
+	"logMsg": func(size int) string {
+		return ""
+	},
+	"logBr": func(size int) string {
+		return ""
+	},
+	"logLogger": func(size int, clazzSize int) string {
+		return ""
+	},
+}
+
+func NewLayout(pattern string) *PatternLayout {
+	l := &PatternLayout{
+		Pattern:         pattern,
+		HasRuntimeParam: false,
+	}
+	// 判断是否包含line file 需要去runtime里面拿
+	//if strings.Index(pattern,"%line") > -1 {
+	//	l.HasRuntimeParam = true
+	//}else if strings.Index(pattern,"%file") > -1 {
+	//	l.HasRuntimeParam = true
+	//}
+
+	f := pattern
+	f = date1.ReplaceAllStringFunc(f, func(row string) string {
+		p := strings.Index(row, "{")
+		dateFormat := "2006-01-02 15:04:05"
+		if p >= 0 {
+			p1 := strings.Index(row, "}")
+			dateFormat = row[p+1 : p1]
+		}
+		return fmt.Sprintf(`{{logDate "%s"}}`, dateFormat)
+	})
+
+	f = thread1.ReplaceAllStringFunc(f, func(row string) string {
+		p := strings.Index(row, "-")
+		maxSize := 0
+		if p >= 0 {
+			p1 := strings.Index(row, "thread")
+			maxSizeStr := row[p+1 : p1]
+			maxSize, _ = strconv.Atoi(maxSizeStr)
+		}
+		return fmt.Sprintf(`{{logThread %d}}`, maxSize)
+	})
+
+	f = level1.ReplaceAllStringFunc(f, func(row string) string {
+		p := strings.Index(row, "-")
+		maxSize := 0
+		if p >= 0 {
+			p1 := strings.Index(row, "level")
+			maxSizeStr := row[p+1 : p1]
+			maxSize, _ = strconv.Atoi(maxSizeStr)
+		}
+		return fmt.Sprintf(`{{logLevel %d}}`, maxSize)
+	})
+
+	//line|file|msg|n|logger
+
+	f = line1.ReplaceAllStringFunc(f, func(row string) string {
+		l.HasRuntimeParam = true
+		p := strings.Index(row, "-")
+		maxSize := 0
+		if p >= 0 {
+			p1 := strings.Index(row, "line")
+			maxSizeStr := row[p+1 : p1]
+			maxSize, _ = strconv.Atoi(maxSizeStr)
+		}
+		return fmt.Sprintf(`{{logLine %d}}`, maxSize)
+	})
+
+	f = file1.ReplaceAllStringFunc(f, func(row string) string {
+		l.HasRuntimeParam = true
+		p := strings.Index(row, "-")
+		maxSize := 0
+		if p >= 0 {
+			p1 := strings.Index(row, "file")
+			maxSizeStr := row[p+1 : p1]
+			maxSize, _ = strconv.Atoi(maxSizeStr)
+		}
+		return fmt.Sprintf(`{{logFile %d}}`, maxSize)
+	})
+	//msg|n|logger
+
+	f = msg1.ReplaceAllStringFunc(f, func(row string) string {
+		return fmt.Sprintf(`{{logMsg %d}}`, 0)
+	})
+
+	f = br.ReplaceAllStringFunc(f, func(row string) string {
+		return fmt.Sprintf(`{{logBr %d}}`, 0)
+	})
+	//%logger{n}
+
+	f = logger1.ReplaceAllStringFunc(f, func(row string) string {
+		//return fmt.Sprintf(`{{logBr %d}}`,0)
+		p := strings.Index(row, "-")
+		maxSize := 0
+		if p >= 0 {
+			p1 := strings.Index(row, "logger")
+			maxSizeStr := row[p+1 : p1]
+			maxSize, _ = strconv.Atoi(maxSizeStr)
+		}
+
+		p1 := strings.Index(row, "{")
+		clazzSize := -1
+		if p1 >= 0 {
+			p2 := strings.Index(row, "}")
+			clazzSizeStr := row[p1+1 : p2]
+			clazzSize, _ = strconv.Atoi(clazzSizeStr)
+		}
+		return fmt.Sprintf(`{{logLogger %d %d}}`, maxSize, clazzSize)
+	})
+
+	fmt.Println("--->", f)
+	fmt.Println("--->", util.StringUtil.GetRandomStr(7), util.StringUtil.GetRandomStr(7), util.StringUtil.GetRandomStr(7))
+	l.Tpl = template.Must(template.New(fmt.Sprintf("%s-%s-logcore",
+		util.DateUtil.FormatNowByType(util.DatePattern2),
+		util.StringUtil.GetRandomStr(7))).Funcs(layOutFuncMap).Parse(f))
+
+	return l
+}
 
 type ConsoleAppenderImpl struct {
-	Pattern string
+	Layout *PatternLayout
 }
 
 func (c *ConsoleAppenderImpl) AppenderKey() string {
@@ -32,21 +191,24 @@ func (c *ConsoleAppenderImpl) AppenderKey() string {
 }
 
 func (c *ConsoleAppenderImpl) NewAppender(ele *logclass.LogAppenderXmlEle) logclass.LogAppender {
+	layout := NewLayout(ele.Encoder[0].Pattern)
 	result := &ConsoleAppenderImpl{
-		Pattern: ele.Encoder[0].Pattern,
+		Layout: layout,
 	}
 	return logclass.LogAppender(result)
 }
 
-func (c *ConsoleAppenderImpl) AppendRow(row string) {
-	os.Stdout.WriteString(row + "\n")
+func (c *ConsoleAppenderImpl) AppendRow(local *context.LocalStack, config *logclass.LoggerConfig, row string, err error) {
+	result := c.Layout.DoLayout(local, config, row, err)
+	os.Stdout.WriteString(result)
+	os.Stdout.Sync()
 }
 
 type Logger struct {
 	Config *logclass.LoggerConfig
 }
 
-func (l *Logger) Trace(format string, a ...interface{}) {
+func (l *Logger) Trace(local *context.LocalStack, format string, a ...interface{}) {
 	if !l.IsTraceEnable() {
 		return
 	}
@@ -55,7 +217,7 @@ func (l *Logger) Trace(format string, a ...interface{}) {
 	current := l.Config
 	for current != nil && l.isLevelEnable(TRACELevel, current) {
 		for _, appender := range l.Config.Appender {
-			appender.AppendRow(content)
+			appender.AppendRow(local, l.Config, content, nil)
 		}
 		if !current.Additivity {
 			break
@@ -68,7 +230,7 @@ func (l *Logger) IsTraceEnable() bool {
 	return l.isLevelEnable(TRACELevel, l.Config)
 }
 
-func (l *Logger) Debug(format string, a ...interface{}) {
+func (l *Logger) Debug(local *context.LocalStack, format string, a ...interface{}) {
 	if !l.IsDebugEnable() {
 		return
 	}
@@ -77,7 +239,7 @@ func (l *Logger) Debug(format string, a ...interface{}) {
 	current := l.Config
 	for current != nil && l.isLevelEnable(DEBUGLevel, current) {
 		for _, appender := range l.Config.Appender {
-			appender.AppendRow(content)
+			appender.AppendRow(local, l.Config, content, nil)
 		}
 		if !current.Additivity {
 			break
@@ -94,7 +256,7 @@ func (l *Logger) IsDebugEnable() bool {
 	return l.isLevelEnable(DEBUGLevel, l.Config)
 }
 
-func (l *Logger) Info(format string, a ...interface{}) {
+func (l *Logger) Info(local *context.LocalStack, format string, a ...interface{}) {
 	if !l.IsInfoEnable() {
 		return
 	}
@@ -103,7 +265,7 @@ func (l *Logger) Info(format string, a ...interface{}) {
 	current := l.Config
 	for current != nil && l.isLevelEnable(INFOLevel, current) {
 		for _, appender := range l.Config.Appender {
-			appender.AppendRow(content)
+			appender.AppendRow(local, l.Config, content, nil)
 		}
 		if !current.Additivity {
 			break
@@ -116,7 +278,7 @@ func (l *Logger) IsInfoEnable() bool {
 	return l.isLevelEnable(INFOLevel, l.Config)
 }
 
-func (l *Logger) Warn(format string, a ...interface{}) {
+func (l *Logger) Warn(local *context.LocalStack, format string, a ...interface{}) {
 	if !l.IsWarnEnable() {
 		return
 	}
@@ -125,7 +287,7 @@ func (l *Logger) Warn(format string, a ...interface{}) {
 	current := l.Config
 	for current != nil && l.isLevelEnable(WARNLevel, current) {
 		for _, appender := range l.Config.Appender {
-			appender.AppendRow(content)
+			appender.AppendRow(local, l.Config, content, nil)
 		}
 		if !current.Additivity {
 			break
@@ -138,7 +300,7 @@ func (l *Logger) IsWarnEnable() bool {
 	return l.isLevelEnable(WARNLevel, l.Config)
 }
 
-func (l *Logger) Error(err error, format string, a ...interface{}) {
+func (l *Logger) Error(local *context.LocalStack, err error, format string, a ...interface{}) {
 	if !l.IsErrorEnable() {
 		return
 	}
@@ -147,7 +309,7 @@ func (l *Logger) Error(err error, format string, a ...interface{}) {
 	current := l.Config
 	for current != nil && l.isLevelEnable(ERRORLevel, current) {
 		for _, appender := range l.Config.Appender {
-			appender.AppendRow(content)
+			appender.AppendRow(local, l.Config, content, err)
 		}
 		if !current.Additivity {
 			break
@@ -292,9 +454,9 @@ func (l *LogFactory) Parse(content string, funcMap template.FuncMap) {
 
 	var tpl *template.Template
 	if funcMap == nil || len(funcMap) == 0 {
-		tpl = template.Must(template.New(fmt.Sprintf("%s-logcore", util.DateUtil.FormatNowByType(util.DatePattern2))).Parse(content))
+		tpl = template.Must(template.New(fmt.Sprintf("%s-%s-logcore", util.DateUtil.FormatNowByType(util.DatePattern2), util.StringUtil.GetRandomStr(5))).Parse(content))
 	} else {
-		tpl = template.Must(template.New(fmt.Sprintf("%s-logcore", util.DateUtil.FormatNowByType(util.DatePattern2))).Funcs(funcMap).Parse(content))
+		tpl = template.Must(template.New(fmt.Sprintf("%s-%s-logcore", util.DateUtil.FormatNowByType(util.DatePattern2), util.StringUtil.GetRandomStr(5))).Funcs(funcMap).Parse(content))
 	}
 
 	buf := &bytes.Buffer{}

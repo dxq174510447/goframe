@@ -21,23 +21,23 @@ type AppLogFactoryer interface {
 }
 
 type AppLoger interface {
-	Trace(format string, a ...interface{})
+	Trace(local *context.LocalStack, format string, a ...interface{})
 
 	IsTraceEnable() bool
 
-	Debug(format string, a ...interface{})
+	Debug(local *context.LocalStack, format string, a ...interface{})
 
 	IsDebugEnable() bool
 
-	Info(format string, a ...interface{})
+	Info(local *context.LocalStack, format string, a ...interface{})
 
 	IsInfoEnable() bool
 
-	Warn(format string, a ...interface{})
+	Warn(local *context.LocalStack, format string, a ...interface{})
 
 	IsWarnEnable() bool
 
-	Error(err error, format string, a ...interface{})
+	Error(local *context.LocalStack, err error, format string, a ...interface{})
 
 	IsErrorEnable() bool
 }

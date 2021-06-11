@@ -1,5 +1,7 @@
 package logclass
 
+import "github.com/dxq174510447/goframe/lib/frame/context"
+
 //Logger, Appenders and Layouts
 //the Appender and Layout interfaces are part
 // (TRACE, DEBUG, INFO, WARN and ERROR)
@@ -9,12 +11,9 @@ package logclass
 // appender 是往上叠加的
 
 type LogAppender interface {
-	AppendRow(row string)
+	AppendRow(local *context.LocalStack, config *LoggerConfig, row string, err error)
 	AppenderKey() string
 	NewAppender(ele *LogAppenderXmlEle) LogAppender
-}
-
-type LogLayouter interface {
 }
 
 type LoggerConfig struct {
