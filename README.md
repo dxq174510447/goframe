@@ -1,4 +1,4 @@
-## mvc(springboot),aop(filter-chain),orm(mybatis)
+## mvc(springboot),aop(filter-chain),orm(mybatis),log(logback)
 
 ## 案例见 仓库下的 firstgo
 
@@ -47,6 +47,10 @@
 
 ### aop
 需要实现ProxyTarger接口,具体见demo txrequireproxyfilter.go  
+
+
+### log
+支持logback配置，暂时只支持console appender,具体用法见案例。后面会添加file和rollingfile
 
 ### 在持续优化中
 
