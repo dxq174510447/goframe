@@ -27,7 +27,7 @@ func (h *DaoLoadStrategy) LoadInstance(local *context.LocalStack, target1 *appli
 	if daoAnno == nil {
 		return false
 	}
-	AddMapperProxyTarget(target)
+	AddMapperProxyTarget(local, target, applicationContext)
 	return true
 }
 

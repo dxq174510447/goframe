@@ -18,6 +18,7 @@ type ServerConfig struct {
 }
 
 type HttpServListener struct {
+	Logger application.AppLoger `FrameAutowired:""`
 }
 
 func (h *HttpServListener) Starting(local *context.LocalStack) {
@@ -32,13 +33,16 @@ func (h *HttpServListener) Running(local *context.LocalStack, application *appli
 	var setting *ServerConfig = &ServerConfig{}
 	application.Environment.GetObjectValue("server", setting)
 
-	s, _ := json.Marshal(setting)
-	fmt.Println("servsetting--->", string(s))
+	if h.Logger.IsDebugEnable() {
+		s, _ := json.Marshal(setting)
+		h.Logger.Debug(local, "httpConfig %s", string(s))
+	}
 
 	DefaultServConfig = setting
 
 	var address string = fmt.Sprintf("%s:%d", "", setting.Port)
-	fmt.Println("http开始监听--->", address)
+	h.Logger.Info(local, "http开始监听 %s", address)
+
 	http.ListenAndServe(address, nil)
 }
 

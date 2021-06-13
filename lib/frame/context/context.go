@@ -1,5 +1,10 @@
 package context
 
+import (
+	"fmt"
+	"github.com/dxq174510447/goframe/lib/frame/util"
+)
+
 // LocalStack 针对上下文设置的环境变量 嵌套 -----------------
 type LocalStack struct {
 	element []map[string]interface{}
@@ -51,6 +56,22 @@ func (f *LocalStack) Get(key string) interface{} {
 		}
 	}
 	return nil
+}
+
+func (f *LocalStack) SetThread() string {
+	threadName := util.DateUtil.FormatNowByType(util.DatePattern3)
+	threadName = fmt.Sprintf("%s-%s", threadName, util.StringUtil.GetRandomStr(5))
+	top := f.Peek()
+	top[ThreadLocalIdKey] = threadName
+	return threadName
+}
+
+func (f *LocalStack) GetThread() string {
+	m := f.Get(ThreadLocalIdKey)
+	if m == nil {
+		return ""
+	}
+	return m.(string)
 }
 
 // NewLocalStack 创建新的变量栈

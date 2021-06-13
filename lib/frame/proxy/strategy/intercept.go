@@ -1,7 +1,6 @@
 package strategy
 
 import (
-	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
@@ -17,8 +16,6 @@ func (d *DefaultProxyFilter) Execute(context *context.LocalStack,
 	methodInfo *proxyclass.ProxyMethod,
 	invoker *reflect.Value,
 	arg []reflect.Value, next *proxyclass.ProxyFilterWrapper) []reflect.Value {
-	fmt.Println("default begin")
-	defer fmt.Println("default end")
 	return (*invoker).Call(arg)
 }
 

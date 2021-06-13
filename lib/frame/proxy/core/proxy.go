@@ -33,8 +33,6 @@ func (m *methodInvoke) initFilter() {
 		return
 	}
 
-	fmt.Println("初始化")
-
 	var fs []proxyclass.ProxyFilter
 	var hasAdd map[string]string = make(map[string]string)
 
@@ -73,7 +71,6 @@ func (m *methodInvoke) initFilter() {
 		})
 	}
 
-	fmt.Println(len(fs))
 	wrapfs := make([]*proxyclass.ProxyFilterWrapper, len(fs), len(fs))
 	for i := 0; i < len(fs); i++ {
 		wrapfs[i] = &proxyclass.ProxyFilterWrapper{
@@ -94,9 +91,9 @@ func (m *methodInvoke) initFilter() {
 func (m *methodInvoke) invoke(context *context.LocalStack, args []reflect.Value) []reflect.Value {
 	m.initFilter()
 	//fmt.Println(len(m.filters))
-	for _, r := range m.filters {
-		fmt.Println(reflect.ValueOf(r).Elem().Type().Name())
-	}
+	//for _, r := range m.filters {
+	//	fmt.Println(reflect.ValueOf(r).Elem().Type().Name())
+	//}
 	return m.filters[0].Execute(context,
 		m.clazz,
 		m.method,
@@ -241,8 +238,8 @@ func proxyStructFuncField(target proxyclass.ProxyTarger,
 
 	proxyCall := func(command *methodInvoke) reflect.Value {
 		newCall := reflect.MakeFunc(field.Type, func(in []reflect.Value) []reflect.Value {
-			fmt.Printf(" %s %s agent begin \n", invoker.clazz.Name, invoker.method.Name)
-			defer fmt.Printf(" %s %s agent end \n", invoker.clazz.Name, invoker.method.Name)
+			//fmt.Printf(" %s %s agent begin \n", invoker.clazz.Name, invoker.method.Name)
+			//defer fmt.Printf(" %s %s agent end \n", invoker.clazz.Name, invoker.method.Name)
 			return command.invoke(in[0].Interface().(*context.LocalStack), in)
 		})
 		return newCall

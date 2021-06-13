@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/xml"
 	"fmt"
+	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/exception"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/core"
@@ -142,6 +143,7 @@ type sqlColumnType struct {
 }
 
 type sqlInvoke struct {
+	Logger         application.AppLoger
 	target         interface{}
 	clazz          *proxyclass.ProxyClass
 	method         *proxyclass.ProxyMethod
@@ -276,8 +278,12 @@ func (s *sqlInvoke) invokeSelect(local *context.LocalStack, args []reflect.Value
 	if newsql != "" {
 		sql = newsql
 	}
-	fmt.Printf("Sql[%s]: %s \n", sqlEle.Id, sql)
-	fmt.Printf("Paramters[%s]: %s \n", sqlEle.Id, GetSqlParamterStri(sqlParam))
+
+	if s.Logger != nil && s.Logger.IsDebugEnable() {
+		s.Logger.Debug(local, "--SQL %s: %s", sqlEle.Id, sql)
+		s.Logger.Debug(local, "PARAM %s: %s", sqlEle.Id, GetSqlParamterStri(sqlParam))
+	}
+
 	stmt, err := con.Con.PrepareContext(con.Ctx, sql)
 	if err != nil {
 		if errorFlag == 0 {
@@ -296,11 +302,11 @@ func (s *sqlInvoke) invokeSelect(local *context.LocalStack, args []reflect.Value
 	var queryError error
 	switch s.returnSqlType.Kind() {
 	case reflect.Slice:
-		queryResult, queryError = s.selectList(stmt, sqlParam, errorFlag)
+		queryResult, queryError = s.selectList(local, sqlEle, stmt, sqlParam, errorFlag)
 	case reflect.Ptr:
-		queryResult, queryError = s.selectRow(stmt, sqlParam, errorFlag)
+		queryResult, queryError = s.selectRow(local, sqlEle, stmt, sqlParam, errorFlag)
 	case reflect.Int, reflect.Int64, reflect.Float64:
-		queryResult, queryError = s.selectRow(stmt, sqlParam, errorFlag)
+		queryResult, queryError = s.selectRow(local, sqlEle, stmt, sqlParam, errorFlag)
 	default:
 		fmt.Println("2")
 	}
@@ -372,8 +378,14 @@ func (s *sqlInvoke) invokeUpdate(local *context.LocalStack, args []reflect.Value
 	if newsql != "" {
 		sql = newsql
 	}
-	fmt.Printf("Sql[%s]: %s \n", sqlEle.Id, sql)
-	fmt.Printf("Paramters[%s]: %s \n", sqlEle.Id, GetSqlParamterStri(sqlParam))
+	//fmt.Printf("Sql[%s]: %s \n", sqlEle.Id, sql)
+	//fmt.Printf("Paramters[%s]: %s \n", sqlEle.Id, GetSqlParamterStri(sqlParam))
+
+	if s.Logger != nil && s.Logger.IsDebugEnable() {
+		s.Logger.Debug(local, "--SQL %s: %s", sqlEle.Id, sql)
+		s.Logger.Debug(local, "PARAM %s: %s", sqlEle.Id, GetSqlParamterStri(sqlParam))
+	}
+
 	stmt, err := con.Con.PrepareContext(con.Ctx, sql)
 	if err != nil {
 		if errorFlag == 0 {
@@ -401,8 +413,14 @@ func (s *sqlInvoke) invokeUpdate(local *context.LocalStack, args []reflect.Value
 			}
 		}
 	}
+
 	if s.returnSqlType != nil {
 		r1, _ := sqlResult.RowsAffected()
+
+		if s.Logger != nil && s.Logger.IsDebugEnable() {
+			s.Logger.Debug(local, "COUNT %s: %d", sqlEle.Id, int(r1))
+		}
+
 		return []reflect.Value{reflect.ValueOf(int(r1)), nilError}
 	} else {
 		return []reflect.Value{nilError}
@@ -456,8 +474,12 @@ func (s *sqlInvoke) invokeDelete(local *context.LocalStack, args []reflect.Value
 	if newsql != "" {
 		sql = newsql
 	}
-	fmt.Printf("Sql[%s]: %s \n", sqlEle.Id, sql)
-	fmt.Printf("Paramters[%s]: %s \n", sqlEle.Id, GetSqlParamterStri(sqlParam))
+	//fmt.Printf("Sql[%s]: %s \n", sqlEle.Id, sql)
+	//fmt.Printf("Paramters[%s]: %s \n", sqlEle.Id, GetSqlParamterStri(sqlParam))
+	if s.Logger != nil && s.Logger.IsDebugEnable() {
+		s.Logger.Debug(local, "--SQL %s: %s", sqlEle.Id, sql)
+		s.Logger.Debug(local, "PARAM %s: %s", sqlEle.Id, GetSqlParamterStri(sqlParam))
+	}
 	stmt, err := con.Con.PrepareContext(con.Ctx, sql)
 	if err != nil {
 		if errorFlag == 0 {
@@ -488,6 +510,11 @@ func (s *sqlInvoke) invokeDelete(local *context.LocalStack, args []reflect.Value
 
 	if s.returnSqlType != nil {
 		r1, _ := sqlResult.RowsAffected()
+
+		if s.Logger != nil && s.Logger.IsDebugEnable() {
+			s.Logger.Debug(local, "COUNT %s: %d", sqlEle.Id, int(r1))
+		}
+
 		return []reflect.Value{reflect.ValueOf(int(r1)), nilError}
 	} else {
 		return []reflect.Value{nilError}
@@ -541,8 +568,14 @@ func (s *sqlInvoke) invokeInsert(local *context.LocalStack, args []reflect.Value
 	if newsql != "" {
 		sql1 = newsql
 	}
-	fmt.Printf("Sql[%s]: %s \n", sqlEle.Id, sql1)
-	fmt.Printf("Paramters[%s]: %s \n", sqlEle.Id, GetSqlParamterStri(sqlParam))
+	//fmt.Printf("Sql[%s]: %s \n", sqlEle.Id, sql1)
+	//fmt.Printf("Paramters[%s]: %s \n", sqlEle.Id, GetSqlParamterStri(sqlParam))
+
+	if s.Logger != nil && s.Logger.IsDebugEnable() {
+		s.Logger.Debug(local, "--SQL %s: %s", sqlEle.Id, sql1)
+		s.Logger.Debug(local, "PARAM %s: %s", sqlEle.Id, GetSqlParamterStri(sqlParam))
+	}
+
 	stmt, err := con.Con.PrepareContext(con.Ctx, sql1)
 	if err != nil {
 		if errorFlag == 0 {
@@ -601,6 +634,9 @@ func (s *sqlInvoke) invokeInsert(local *context.LocalStack, args []reflect.Value
 
 	if s.returnSqlType != nil {
 		r1, _ := sqlResult.RowsAffected()
+		if s.Logger != nil && s.Logger.IsDebugEnable() {
+			s.Logger.Debug(local, "COUNT %s: %d", sqlEle.Id, int(r1))
+		}
 		return []reflect.Value{reflect.ValueOf(int(r1)), nilError}
 	} else {
 		return []reflect.Value{nilError}
@@ -656,7 +692,7 @@ func (s *sqlInvoke) getArgumentsFromSql(local *context.LocalStack, args []reflec
 	return result, nsql, nil
 }
 
-func (s *sqlInvoke) selectList(stmt *sql.Stmt, param []interface{}, errorFlag int) (*reflect.Value, error) {
+func (s *sqlInvoke) selectList(local *context.LocalStack, sqlEle *MapperElementXml, stmt *sql.Stmt, param []interface{}, errorFlag int) (*reflect.Value, error) {
 	result, err1 := stmt.Query(param...)
 	if err1 != nil {
 		if errorFlag == 0 {
@@ -689,7 +725,9 @@ func (s *sqlInvoke) selectList(stmt *sql.Stmt, param []interface{}, errorFlag in
 		}
 	}
 
-	fmt.Printf("column列类型 %s \n", GetSqlColumnType(s.sqlFieldMap))
+	if s.Logger != nil && s.Logger.IsTraceEnable() {
+		s.Logger.Trace(local, "column列类型 %s", GetSqlColumnType(s.sqlFieldMap))
+	}
 
 	for result.Next() {
 		if queryCount != 0 && currentCount >= pageSize {
@@ -712,7 +750,11 @@ func (s *sqlInvoke) selectList(stmt *sql.Stmt, param []interface{}, errorFlag in
 		queryCount++
 		currentCount++
 	}
-	fmt.Printf("queryCount %d \n", queryCount)
+
+	if s.Logger != nil && s.Logger.IsDebugEnable() {
+		s.Logger.Debug(local, "COUNT %s: %d", sqlEle.Id, queryCount)
+	}
+
 	if queryCount > 0 {
 		total = reflect.AppendSlice(total, current)
 		total = total.Slice(0, queryCount)
@@ -720,7 +762,7 @@ func (s *sqlInvoke) selectList(stmt *sql.Stmt, param []interface{}, errorFlag in
 	return &total, nil
 }
 
-func (s *sqlInvoke) selectRow(stmt *sql.Stmt, param []interface{}, errorFlag int) (*reflect.Value, error) {
+func (s *sqlInvoke) selectRow(local *context.LocalStack, sqlEle *MapperElementXml, stmt *sql.Stmt, param []interface{}, errorFlag int) (*reflect.Value, error) {
 	result, err1 := stmt.Query(param...)
 	if err1 != nil {
 		if errorFlag == 0 {
@@ -747,7 +789,9 @@ func (s *sqlInvoke) selectRow(stmt *sql.Stmt, param []interface{}, errorFlag int
 		}
 	}
 
-	fmt.Printf("column列类型 %s \n", GetSqlColumnType(s.sqlFieldMap))
+	if s.Logger != nil && s.Logger.IsTraceEnable() {
+		s.Logger.Trace(local, "column列类型 %s", GetSqlColumnType(s.sqlFieldMap))
+	}
 
 	if result.Next() {
 		r1, err2 := s.scanRow(result)
@@ -758,8 +802,14 @@ func (s *sqlInvoke) selectRow(stmt *sql.Stmt, param []interface{}, errorFlag int
 				return nil, err2
 			}
 		}
+		if s.Logger != nil && s.Logger.IsDebugEnable() {
+			s.Logger.Debug(local, "COUNT %s: %d", sqlEle.Id, 1)
+		}
 		return r1, nil
 	} else {
+		if s.Logger != nil && s.Logger.IsDebugEnable() {
+			s.Logger.Debug(local, "COUNT %s: %d", sqlEle.Id, 0)
+		}
 		return s.defaultReturnValue, nil
 	}
 }
@@ -849,7 +899,7 @@ func newSqlInvoke(
 	//base xml 节点
 	baseXmlEle map[string]*MapperElementXml,
 	//entity 解析结构
-	tableDef *TableDef,
+	tableDef *TableDef, local *context.LocalStack, applicationContext *application.FrameApplicationContext,
 ) *sqlInvoke {
 
 	var returnSqlElementType reflect.Type = nil
@@ -890,8 +940,12 @@ func newSqlInvoke(
 			returnSqlElementType = returnSqlType
 		}
 	}
-
+	var logger application.AppLoger
+	if applicationContext != nil && applicationContext.LogFactory != nil {
+		logger = applicationContext.LogFactory.GetLoggerType(reflect.TypeOf(target).Elem())
+	}
 	return &sqlInvoke{
+		Logger:               logger,
 		target:               target,
 		clazz:                clazz,
 		method:               method,
@@ -922,7 +976,8 @@ func GetDaoConfig(target1 proxyclass.ProxyTarger) *DaoConfig {
 	return nil
 }
 
-func AddMapperProxyTarget(target1 proxyclass.ProxyTarger) {
+func AddMapperProxyTarget(local *context.LocalStack, target1 proxyclass.ProxyTarger,
+	applicationContext *application.FrameApplicationContext) {
 
 	//解析字段方法 包裹一层
 	rv := reflect.ValueOf(target1)
@@ -962,14 +1017,14 @@ func AddMapperProxyTarget(target1 proxyclass.ProxyTarger) {
 						target := rv.Elem().FieldByName(field.Name)
 						addCallerToField(target1, &target, &basefield, methodRef,
 							baseXmlEle, dapEntity, true,
-							baseXmlEle, tableDef)
+							baseXmlEle, tableDef, local, applicationContext)
 					}
 				}
 			} else if field.Type.Kind() == reflect.Func && rv.Elem().FieldByName(field.Name).IsNil() {
 				target := rv.Elem()
 				addCallerToField(target1, &target, &field, methodRef,
 					xmlele, dapEntity, false,
-					baseXmlEle, tableDef)
+					baseXmlEle, tableDef, local, applicationContext)
 			}
 		}
 	}
@@ -985,7 +1040,7 @@ func addCallerToField(target1 proxyclass.ProxyTarger,
 	entityptr interface{},
 	baseMethod bool,
 	baseXmlEle map[string]*MapperElementXml,
-	tableDef *TableDef,
+	tableDef *TableDef, local *context.LocalStack, applicationContext *application.FrameApplicationContext,
 ) {
 	call := target.FieldByName(field.Name)
 
@@ -1016,13 +1071,13 @@ func addCallerToField(target1 proxyclass.ProxyTarger,
 			xmlele, field.Type.Out(0),
 			providerConfig, defaultReturnValue, structFields, entityptr, baseMethod,
 			baseXmlEle,
-			tableDef)
+			tableDef, local, applicationContext)
 	} else {
 		invoker = newSqlInvoke(target1, target1.ProxyTarget(), methodSetting,
 			xmlele, nil,
 			providerConfig, nil, nil, entityptr, baseMethod,
 			baseXmlEle,
-			tableDef)
+			tableDef, local, applicationContext)
 	}
 
 	proxyCall := func(command *sqlInvoke) reflect.Value {

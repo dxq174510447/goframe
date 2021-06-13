@@ -97,7 +97,7 @@ func (a *FrameApplication) AddApplicationContextListener(listener ApplicationCon
 func (a *FrameApplication) Run(args []string) *FrameApplicationContext {
 
 	local := context.NewLocalStack()
-
+	local.SetThread()
 	var listeners *ApplicationRunContextListeners
 	var context *FrameApplicationContext
 	defer func() {
@@ -210,9 +210,63 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 	}
 
 	current := pl.FirstElement
-	injectTarget := make([]*DynamicProxyInstanceNode, 0, 30)
+	//injectTarget := make([]*DynamicProxyInstanceNode, 0, 30)
 
 	for current != nil {
+
+		if len(current.autowiredInjectField) > 0 || len(current.configInjectField) > 0 {
+			//injectTarget = append(injectTarget, current)
+			// 类型注入
+			for _, field := range current.autowiredInjectField {
+
+				// 特殊类型 日志类型注入
+				if field.Type == FrameLogLoggerType {
+					if a.LogFactory != nil {
+						logger := a.LogFactory.GetLoggerType(current.rt.Elem())
+						reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(logger))
+					}
+					continue
+				}
+
+				// 安类型 或者id注入
+				if key, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
+					if key == "" {
+						key = util.ClassUtil.GetClassNameByType(field.Type.Elem())
+					}
+					if ele, ok1 := pl.ElementMap[key]; ok1 {
+						if ele.Target != nil {
+							reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
+						}
+					}
+				}
+			}
+
+			// 配置项注入
+			for _, field := range current.configInjectField {
+				if key, ok := field.Tag.Lookup(ValueInjectKey); ok {
+					if key == "" {
+						continue
+					}
+					var configkey string
+					var configval string
+					if isContainElexpress(key) {
+						b := strings.Index(key, "{")
+						e := strings.LastIndex(key, "}")
+						k1 := key[b+1 : e]
+						d := strings.Index(k1, ":")
+						if d == -1 {
+							configkey = k1
+						} else {
+							configkey = k1[0:d]
+							configval = k1[d+1 : len(k1)]
+						}
+						applicationContext.ValueBindTree.SetBindValue(current, field, configkey, configval)
+					} else {
+						applicationContext.ValueBindTree.SetBindValue(current, field, "", key)
+					}
+				}
+			}
+		}
 
 		var add bool = false
 		if len(a.LoadStrategy) > 0 {
@@ -225,10 +279,6 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 		}
 		if !add {
 			core.AddClassProxy(current.Target)
-		}
-
-		if len(current.autowiredInjectField) > 0 || len(current.configInjectField) > 0 {
-			injectTarget = append(injectTarget, current)
 		}
 
 		if f, ok := current.Target.(ProxyInstanceAdapter); ok {
@@ -247,46 +297,10 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 		current = current.Next
 	}
 
-	for _, target := range injectTarget {
-
-		for _, field := range target.autowiredInjectField {
-			if key, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
-				if key == "" {
-					key = util.ClassUtil.GetClassNameByType(field.Type.Elem())
-				}
-				if ele, ok1 := pl.ElementMap[key]; ok1 {
-					if ele.Target != nil {
-						reflect.ValueOf(target.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
-					}
-				}
-			}
-		}
-
-		for _, field := range target.configInjectField {
-			if key, ok := field.Tag.Lookup(ValueInjectKey); ok {
-				if key == "" {
-					continue
-				}
-				var configkey string
-				var configval string
-				if isContainElexpress(key) {
-					b := strings.Index(key, "{")
-					e := strings.LastIndex(key, "}")
-					k1 := key[b+1 : e]
-					d := strings.Index(k1, ":")
-					if d == -1 {
-						configkey = k1
-					} else {
-						configkey = k1[0:d]
-						configval = k1[d+1 : len(k1)]
-					}
-					applicationContext.ValueBindTree.SetBindValue(target, field, configkey, configval)
-				} else {
-					applicationContext.ValueBindTree.SetBindValue(target, field, "", key)
-				}
-			}
-		}
-	}
+	//for _, target := range injectTarget {
+	//
+	//
+	//}
 }
 
 // ConfigureEnvironment 加载配置文件

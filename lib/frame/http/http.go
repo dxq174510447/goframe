@@ -244,7 +244,7 @@ func AddControllerProxyTarget(target1 proxyclass.ProxyTarger) {
 	f := func(invoker1 *ControllerVar) func(http.ResponseWriter, *http.Request) {
 		return func(response http.ResponseWriter, request *http.Request) {
 			local := context.NewLocalStack()
-
+			local.SetThread()
 			SetCurrentHttpRequest(local, request)
 			SetCurrentHttpResponse(local, response)
 

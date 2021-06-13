@@ -33,6 +33,8 @@ var FrameLoadInstanceHandlerTypeName string = util.ClassUtil.GetClassNameByType(
 var FrameLogFactoryerType reflect.Type = reflect.Zero(reflect.TypeOf((*AppLogFactoryer)(nil)).Elem()).Type()
 var FrameLogFactoryerTypeName string = util.ClassUtil.GetClassNameByType(FrameLogFactoryerType)
 
+var FrameLogLoggerType reflect.Type = reflect.Zero(reflect.TypeOf((*AppLoger)(nil)).Elem()).Type()
+
 func SetEnvironmentToApplication(local *context.LocalStack, env *ConfigurableEnvironment) {
 	local.Set(FrameEnvironmentKey, env)
 }

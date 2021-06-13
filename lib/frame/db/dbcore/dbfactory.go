@@ -133,7 +133,6 @@ func NewDatabase(c *DatabaseConfig, key string) *DatabaseInstance {
 	url := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=true&loc=Local",
 		c.DbUser, c.DbPwd, c.DbHost, c.DbPort, c.DbName,
 	)
-	fmt.Println(url)
 	db, _ := sql.Open("mysql", url)
 	db.SetConnMaxLifetime(time.Minute * 3)
 	db.SetMaxOpenConns(1000)
@@ -170,6 +169,7 @@ func (d *DatabaseInstance) ProxyTarget() *proxyclass.ProxyClass {
 }
 
 type DatabaseFactory struct {
+	Logger application.AppLoger `FrameAutowired:""`
 }
 
 func (d *DatabaseFactory) ProxyTarget() *proxyclass.ProxyClass {
@@ -181,7 +181,7 @@ func (d *DatabaseFactory) ProxyGet(local *context2.LocalStack, application1 *app
 	applicationContext.Environment.GetObjectValue("platform.datasource.config", setting)
 
 	s, _ := json.Marshal(setting)
-	fmt.Println("dbsetting--->", string(s))
+	d.Logger.Debug(local, "dbsetting--->%s", string(s))
 
 	for k, v := range setting {
 		db := NewDatabase(v, k)

@@ -7,13 +7,17 @@ import (
 	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/log/logclass"
+	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"github.com/dxq174510447/goframe/lib/frame/util"
+	"io"
 	"os"
 	"reflect"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 )
 
 // Release lock while getting caller info - it's expensive.
@@ -35,54 +39,145 @@ var br = regexp.MustCompile("%(\\-\\d+)?n")
 var logger1 = regexp.MustCompile("%(\\-\\d+)?logger(\\{[^\\}]+\\})?")
 
 // %date %date{HH:mm:ss.SSS} %{-n}thread %{-n}level %logger{n} %line %file %msg %n
+type LogMessage struct {
+	Name     string
+	Level    string
+	Line     string
+	FileName string
+	Msg      string
+	Err      error
+	Thread   string
+	Date     time.Time
+}
 type PatternLayout struct {
 	Pattern         string
 	HasRuntimeParam bool
 	Tpl             *template.Template
+	Target          io.Writer
 }
 
-func (p *PatternLayout) DoLayout(local *context.LocalStack, config *logclass.LoggerConfig, row string, err error) string {
-	return ""
+func (p *PatternLayout) DoLayout(local *context.LocalStack, config *logclass.LoggerConfig, row string, err error) {
+	msg := &LogMessage{
+		Name:  config.Name,
+		Level: config.Level,
+		Msg:   row,
+		Err:   err,
+		Date:  time.Now(),
+	}
+	if p.HasRuntimeParam {
+		_, file, line, ok := runtime.Caller(3)
+		if !ok {
+			msg.FileName = "???"
+			msg.Line = "0"
+		} else {
+			msg.FileName = util.ClassUtil.GetJavaFileNameByType(file)
+			msg.Line = strconv.Itoa(line)
+		}
+	}
+	if local != nil {
+		th := local.GetThread()
+		if th == "" {
+			th = "-"
+		}
+		msg.Thread = th
+	}
+
+	// fmt.Println(util.JsonUtil.To2String(msg))
+	err1 := p.Tpl.Execute(p.Target, msg)
+	if err1 != nil {
+		panic(err1)
+	}
 }
 
 var layOutFuncMap = template.FuncMap{
-	"logDate": func(format string) string {
-		return util.DateUtil.FormatNowByType(format)
+	"logDate": func(format string, msg *LogMessage) string {
+		return util.DateUtil.FormatByType(msg.Date, format)
 	},
-	"logThread": func(size int) string {
-		return ""
+	"logThread": func(size int, msg *LogMessage) string {
+		if len(msg.Thread) >= size {
+			return msg.Thread
+		}
+
+		n := []byte(msg.Thread)
+		sp := make([]byte, size, size)
+		for i := 0; i < size; i++ {
+			sp[i] = 32
+		}
+		copy(sp, n)
+		return string(sp)
 	},
-	"logLevel": func(size int) string {
-		return ""
+	"logLevel": func(size int, msg *LogMessage) string {
+		if len(msg.Level) >= size {
+			return msg.Level
+		}
+
+		n := []byte(msg.Level)
+		sp := make([]byte, size, size)
+		for i := 0; i < size; i++ {
+			sp[i] = 32
+		}
+		copy(sp, n)
+		return string(sp)
 	},
-	"logLine": func(size int) string {
-		return ""
+	"logLine": func(size int, msg *LogMessage) string {
+		if len(msg.Line) >= size {
+			return msg.Line
+		}
+
+		n := []byte(msg.Line)
+		sp := make([]byte, size, size)
+		for i := 0; i < size; i++ {
+			sp[i] = 32
+		}
+		copy(sp, n)
+		return string(sp)
 	},
-	"logFile": func(size int) string {
-		return ""
+	"logFile": func(size int, msg *LogMessage) string {
+		if len(msg.FileName) >= size {
+			return msg.FileName
+		}
+
+		n := []byte(msg.FileName)
+		sp := make([]byte, size, size)
+		for i := 0; i < size; i++ {
+			sp[i] = 32
+		}
+		copy(sp, n)
+		return string(sp)
 	},
-	"logMsg": func(size int) string {
-		return ""
+	"logMsg": func(size int, msg *LogMessage) string {
+		return msg.Msg
 	},
-	"logBr": func(size int) string {
-		return ""
+	"logBr": func(size int, msg *LogMessage) string {
+		return "\n"
 	},
-	"logLogger": func(size int, clazzSize int) string {
-		return ""
+	"logLogger": func(size int, clazzSize int, msg *LogMessage) string {
+		className := msg.Name
+		if clazzSize == 0 {
+			p := strings.LastIndex(className, ".")
+			className = className[p+1:]
+		}
+
+		if len(className) >= size {
+			return className
+		}
+
+		n := []byte(className)
+		sp := make([]byte, size, size)
+		for i := 0; i < size; i++ {
+			sp[i] = 32
+		}
+		copy(sp, n)
+		return string(sp)
 	},
 }
 
-func NewLayout(pattern string) *PatternLayout {
+func NewLayout(pattern string, writer io.Writer) *PatternLayout {
 	l := &PatternLayout{
 		Pattern:         pattern,
 		HasRuntimeParam: false,
+		Target:          writer,
 	}
-	// 判断是否包含line file 需要去runtime里面拿
-	//if strings.Index(pattern,"%line") > -1 {
-	//	l.HasRuntimeParam = true
-	//}else if strings.Index(pattern,"%file") > -1 {
-	//	l.HasRuntimeParam = true
-	//}
 
 	f := pattern
 	f = date1.ReplaceAllStringFunc(f, func(row string) string {
@@ -92,7 +187,7 @@ func NewLayout(pattern string) *PatternLayout {
 			p1 := strings.Index(row, "}")
 			dateFormat = row[p+1 : p1]
 		}
-		return fmt.Sprintf(`{{logDate "%s"}}`, dateFormat)
+		return fmt.Sprintf(`{{logDate "%s" .}}`, dateFormat)
 	})
 
 	f = thread1.ReplaceAllStringFunc(f, func(row string) string {
@@ -103,7 +198,7 @@ func NewLayout(pattern string) *PatternLayout {
 			maxSizeStr := row[p+1 : p1]
 			maxSize, _ = strconv.Atoi(maxSizeStr)
 		}
-		return fmt.Sprintf(`{{logThread %d}}`, maxSize)
+		return fmt.Sprintf(`{{logThread %d .}}`, maxSize)
 	})
 
 	f = level1.ReplaceAllStringFunc(f, func(row string) string {
@@ -114,7 +209,7 @@ func NewLayout(pattern string) *PatternLayout {
 			maxSizeStr := row[p+1 : p1]
 			maxSize, _ = strconv.Atoi(maxSizeStr)
 		}
-		return fmt.Sprintf(`{{logLevel %d}}`, maxSize)
+		return fmt.Sprintf(`{{logLevel %d .}}`, maxSize)
 	})
 
 	//line|file|msg|n|logger
@@ -128,7 +223,7 @@ func NewLayout(pattern string) *PatternLayout {
 			maxSizeStr := row[p+1 : p1]
 			maxSize, _ = strconv.Atoi(maxSizeStr)
 		}
-		return fmt.Sprintf(`{{logLine %d}}`, maxSize)
+		return fmt.Sprintf(`{{logLine %d .}}`, maxSize)
 	})
 
 	f = file1.ReplaceAllStringFunc(f, func(row string) string {
@@ -140,16 +235,17 @@ func NewLayout(pattern string) *PatternLayout {
 			maxSizeStr := row[p+1 : p1]
 			maxSize, _ = strconv.Atoi(maxSizeStr)
 		}
-		return fmt.Sprintf(`{{logFile %d}}`, maxSize)
+		return fmt.Sprintf(`{{logFile %d .}}`, maxSize)
 	})
 	//msg|n|logger
 
 	f = msg1.ReplaceAllStringFunc(f, func(row string) string {
-		return fmt.Sprintf(`{{logMsg %d}}`, 0)
+		return fmt.Sprintf(`{{logMsg %d .}}`, 0)
 	})
 
 	f = br.ReplaceAllStringFunc(f, func(row string) string {
-		return fmt.Sprintf(`{{logBr %d}}`, 0)
+		//return fmt.Sprintf(`{{logBr %d}}`, 0)
+		return "\n"
 	})
 	//%logger{n}
 
@@ -170,12 +266,10 @@ func NewLayout(pattern string) *PatternLayout {
 			clazzSizeStr := row[p1+1 : p2]
 			clazzSize, _ = strconv.Atoi(clazzSizeStr)
 		}
-		return fmt.Sprintf(`{{logLogger %d %d}}`, maxSize, clazzSize)
+		return fmt.Sprintf(`{{logLogger %d %d .}}`, maxSize, clazzSize)
 	})
 
-	fmt.Println("--->", f)
-	fmt.Println("--->", util.StringUtil.GetRandomStr(7), util.StringUtil.GetRandomStr(7), util.StringUtil.GetRandomStr(7))
-	l.Tpl = template.Must(template.New(fmt.Sprintf("%s-%s-logcore",
+	l.Tpl = template.Must(template.New(fmt.Sprintf("%s-%s-loglayout",
 		util.DateUtil.FormatNowByType(util.DatePattern2),
 		util.StringUtil.GetRandomStr(7))).Funcs(layOutFuncMap).Parse(f))
 
@@ -184,6 +278,7 @@ func NewLayout(pattern string) *PatternLayout {
 
 type ConsoleAppenderImpl struct {
 	Layout *PatternLayout
+	Target io.Writer
 }
 
 func (c *ConsoleAppenderImpl) AppenderKey() string {
@@ -191,16 +286,16 @@ func (c *ConsoleAppenderImpl) AppenderKey() string {
 }
 
 func (c *ConsoleAppenderImpl) NewAppender(ele *logclass.LogAppenderXmlEle) logclass.LogAppender {
-	layout := NewLayout(ele.Encoder[0].Pattern)
+	layout := NewLayout(ele.Encoder[0].Pattern, os.Stdout)
 	result := &ConsoleAppenderImpl{
 		Layout: layout,
+		Target: os.Stdout,
 	}
 	return logclass.LogAppender(result)
 }
 
 func (c *ConsoleAppenderImpl) AppendRow(local *context.LocalStack, config *logclass.LoggerConfig, row string, err error) {
-	result := c.Layout.DoLayout(local, config, row, err)
-	os.Stdout.WriteString(result)
+	c.Layout.DoLayout(local, config, row, err)
 	os.Stdout.Sync()
 }
 
@@ -216,7 +311,7 @@ func (l *Logger) Trace(local *context.LocalStack, format string, a ...interface{
 	content := fmt.Sprintf(format, a...)
 	current := l.Config
 	for current != nil && l.isLevelEnable(TRACELevel, current) {
-		for _, appender := range l.Config.Appender {
+		for _, appender := range current.Appender {
 			appender.AppendRow(local, l.Config, content, nil)
 		}
 		if !current.Additivity {
@@ -238,7 +333,7 @@ func (l *Logger) Debug(local *context.LocalStack, format string, a ...interface{
 	content := fmt.Sprintf(format, a...)
 	current := l.Config
 	for current != nil && l.isLevelEnable(DEBUGLevel, current) {
-		for _, appender := range l.Config.Appender {
+		for _, appender := range current.Appender {
 			appender.AppendRow(local, l.Config, content, nil)
 		}
 		if !current.Additivity {
@@ -264,7 +359,7 @@ func (l *Logger) Info(local *context.LocalStack, format string, a ...interface{}
 	content := fmt.Sprintf(format, a...)
 	current := l.Config
 	for current != nil && l.isLevelEnable(INFOLevel, current) {
-		for _, appender := range l.Config.Appender {
+		for _, appender := range current.Appender {
 			appender.AppendRow(local, l.Config, content, nil)
 		}
 		if !current.Additivity {
@@ -286,7 +381,7 @@ func (l *Logger) Warn(local *context.LocalStack, format string, a ...interface{}
 	content := fmt.Sprintf(format, a...)
 	current := l.Config
 	for current != nil && l.isLevelEnable(WARNLevel, current) {
-		for _, appender := range l.Config.Appender {
+		for _, appender := range current.Appender {
 			appender.AppendRow(local, l.Config, content, nil)
 		}
 		if !current.Additivity {
@@ -308,7 +403,7 @@ func (l *Logger) Error(local *context.LocalStack, err error, format string, a ..
 	content := fmt.Sprintf(format, a...)
 	current := l.Config
 	for current != nil && l.isLevelEnable(ERRORLevel, current) {
-		for _, appender := range l.Config.Appender {
+		for _, appender := range current.Appender {
 			appender.AppendRow(local, l.Config, content, err)
 		}
 		if !current.Additivity {
@@ -336,7 +431,6 @@ type LogFactory struct {
 
 func (l *LogFactory) GetLoggerType(p reflect.Type) application.AppLoger {
 	name := util.ClassUtil.GetJavaClassNameByType(p)
-	fmt.Println(name)
 	return l.GetLoggerString(name)
 }
 
@@ -353,13 +447,15 @@ func (l *LogFactory) GetLoggerString(name string) application.AppLoger {
 		l.AddLevelNode(node1)
 		node = l.RefMap[name]
 	}
+	//l.PrintTree()
+	//fmt.Println(node.Name)
 	if node.Level == "" {
 		current := node.Parent
 		for current != nil {
 			if current.Level != "" {
 				break
 			}
-			current = node.Parent
+			current = current.Parent
 		}
 		node.Extended = 1
 		node.Level = current.Level
@@ -530,6 +626,10 @@ func (l *LogFactory) Parse(content string, funcMap template.FuncMap) {
 	//l.PrintTree()
 }
 
+func (l *LogFactory) ProxyTarget() *proxyclass.ProxyClass {
+	return nil
+}
+
 func AddLogAppender(appender logclass.LogAppender) {
 	key := appender.AppenderKey()
 	buildInAppender[key] = appender
@@ -537,6 +637,6 @@ func AddLogAppender(appender logclass.LogAppender) {
 
 var logFactory LogFactory = LogFactory{}
 
-func GetLogFactory() *LogFactory {
-	return &logFactory
+func init() {
+	application.AddProxyInstance("", proxyclass.ProxyTarger(&logFactory))
 }

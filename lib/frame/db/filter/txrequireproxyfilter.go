@@ -1,7 +1,6 @@
 package filter
 
 import (
-	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/db/dbcore"
@@ -10,6 +9,7 @@ import (
 )
 
 type TxRequireProxyFilter struct {
+	Logger application.AppLoger `FrameAutowired:""`
 }
 
 func (d *TxRequireProxyFilter) Execute(context *context.LocalStack,
@@ -18,25 +18,27 @@ func (d *TxRequireProxyFilter) Execute(context *context.LocalStack,
 	invoker *reflect.Value,
 	arg []reflect.Value, next *proxyclass.ProxyFilterWrapper) []reflect.Value {
 
-	fmt.Printf("TxRequireProxyFilter begin \n")
-	defer fmt.Printf("TxRequireProxyFilter end \n")
+	if d.Logger.IsTraceEnable() {
+		d.Logger.Trace(context, "%s", "TxRequireProxyFilter begin")
+		defer d.Logger.Trace(context, "%s", "TxRequireProxyFilter end")
+	}
 
 	dbcon := dbcore.GetDbConnection(context)
 
 	addNewConnection := false
 
 	if dbcon == nil {
-		fmt.Printf("当前线程未检测到dbconn  \n")
+		d.Logger.Trace(context, "%s", "当前线程未检测到dbconn")
 		addNewConnection = true
 	} else if dbcon != nil && dbcon.TxOpt.ReadOnly {
-		fmt.Printf("当前线程检测到dbconn connectid %s 但是是只读的 需要重新获取连接 \n", dbcon.ConnectId)
+		d.Logger.Debug(context, "当前线程检测到dbconn connectid %s 但是是只读的 需要重新获取连接", dbcon.ConnectId)
 		addNewConnection = true
 	}
 
 	if addNewConnection {
 		// 开启新的连接
 		con := dbcore.OpenSqlConnection(context, 0)
-		fmt.Printf("当前线程初始化新的 connectionId %s \n", con.ConnectId)
+		d.Logger.Debug(context, "当前线程初始化新的 connectionId %s", con.ConnectId)
 
 		// 将当前新的连接放入新的local变量中
 		context.Push()

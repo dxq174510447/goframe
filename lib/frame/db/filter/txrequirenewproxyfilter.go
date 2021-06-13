@@ -1,7 +1,6 @@
 package filter
 
 import (
-	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/db/dbcore"
@@ -10,6 +9,7 @@ import (
 )
 
 type TxRequireNewProxyFilter struct {
+	Logger application.AppLoger `FrameAutowired:""`
 }
 
 func (d *TxRequireNewProxyFilter) Execute(context *context.LocalStack,
@@ -18,12 +18,14 @@ func (d *TxRequireNewProxyFilter) Execute(context *context.LocalStack,
 	invoker *reflect.Value,
 	arg []reflect.Value, next *proxyclass.ProxyFilterWrapper) []reflect.Value {
 
-	fmt.Printf("TxRequireNewProxyFilter begin \n")
-	defer fmt.Printf("TxRequireNewProxyFilter end \n")
+	if d.Logger.IsTraceEnable() {
+		d.Logger.Trace(context, "%s", "TxRequireNewProxyFilter begin")
+		defer d.Logger.Trace(context, "%s", "TxRequireNewProxyFilter end")
+	}
 
 	// 无论线程变量中有没有连接都创建一个新的
 	con := dbcore.OpenSqlConnection(context, 0)
-	fmt.Printf("当前线程初始化新的 connectionId %s \n", con.ConnectId)
+	d.Logger.Trace(context, "当前线程初始化新的 connectionId %s", con.ConnectId)
 
 	// 将当前新的连接放入新的local变量中
 	context.Push()

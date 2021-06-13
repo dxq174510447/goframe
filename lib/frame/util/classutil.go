@@ -22,16 +22,40 @@ func (c *classUtil) GetClassNameByType(t reflect.Type) string {
 func (c *classUtil) GetJavaClassNameByType(t reflect.Type) string {
 	name := fmt.Sprintf("%s/%s", t.PkgPath(), t.Name())
 	name = strings.ReplaceAll(name, "/", ".")
-	p := strings.Index(name, "main.golang")
+	p := strings.Index(name, ".main.golang.")
 	if p == -1 {
-		p1 := strings.Index(name, ".")
-		if p1 == -1 {
-			return name
+		p = strings.Index(name, ".goframe.lib")
+		if p == -1 {
+			p1 := strings.Index(name, ".")
+			if p1 == -1 {
+				return name
+			} else {
+				return name[p1+1:]
+			}
 		} else {
-			return name[p1+1:]
+			return name[p+1:]
 		}
 	} else {
-		return name[p+12:]
+		return name[p+13:]
+	}
+}
+
+func (c *classUtil) GetJavaFileNameByType(name string) string {
+	p := strings.Index(name, "/main/golang/")
+	if p == -1 {
+		p = strings.Index(name, "/goframe/lib")
+		if p == -1 {
+			p1 := strings.Index(name, "/")
+			if p1 == -1 {
+				return name
+			} else {
+				return name[p1+1:]
+			}
+		} else {
+			return name[p+1:]
+		}
+	} else {
+		return name[p+13:]
 	}
 }
 
