@@ -63,4 +63,9 @@
 4. 框架引入logger(完成)
 
 
-
+### 20210613-20210625 v1.1.3
+1. yaml项目变更，触发注入的配置实例变更
+2. 引入事件监听模型
+3. 优化logger，引入file，rollingfile appender
+4. 修复database filter，针对返回error触发回滚（之前是panic）
+5. 将http渲染组件化
