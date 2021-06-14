@@ -121,6 +121,12 @@ func (d *DispatchServlet) Dispatch(local *context.LocalStack, request *http.Requ
 		param := make([]reflect.Value, paramlen)
 		for i := 0; i < paramlen; i++ {
 			pt := methodInvoker.Type().In(i)
+			if pt.Kind() == reflect.Ptr {
+				fmt.Println("method--->", pt.Elem().Name())
+			} else {
+				fmt.Println("method--->", pt.Name())
+			}
+
 			switch pt.Kind() {
 			case reflect.Ptr:
 				if pt.Elem() == reflect.TypeOf(*request) {
@@ -332,4 +338,11 @@ func GetControllerPathPrefix(dispatchServlet *DispatchServlet, target proxyclass
 		cp = ""
 	}
 	return fmt.Sprintf("%s%s", sp, cp)
+}
+
+type WebServletStartedEvent struct {
+}
+
+func (w *WebServletStartedEvent) GetSource() interface{} {
+	return nil
 }

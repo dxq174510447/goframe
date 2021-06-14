@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
+	"github.com/dxq174510447/goframe/lib/frame/event"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"net/http"
+	"time"
 )
 
 type ServerServletConfig struct {
@@ -18,7 +20,8 @@ type ServerConfig struct {
 }
 
 type HttpServListener struct {
-	Logger application.AppLoger `FrameAutowired:""`
+	Logger     application.AppLoger        `FrameAutowired:""`
+	Dispatcher *event.FrameEventDispatcher `FrameAutowired:""`
 }
 
 func (h *HttpServListener) Starting(local *context.LocalStack) {
@@ -43,7 +46,21 @@ func (h *HttpServListener) Running(local *context.LocalStack, application *appli
 	var address string = fmt.Sprintf("%s:%d", "", setting.Port)
 	h.Logger.Info(local, "http开始监听 %s", address)
 
+	go func() {
+		l := context.NewLocalStack()
+		l.SetThread()
+
+		select {
+		case <-time.After(5 * time.Second):
+			h.Logger.Debug(l, "http事件初始化")
+		}
+
+		e := &WebServletStartedEvent{}
+		h.Dispatcher.DispatchEvent(local, e)
+	}()
+
 	http.ListenAndServe(address, nil)
+
 }
 
 func (h *HttpServListener) Failed(local *context.LocalStack, application *application.FrameApplicationContext, err interface{}) {
