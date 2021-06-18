@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
@@ -14,14 +13,11 @@ import (
 type ServerServletConfig struct {
 	ContextPath string
 }
-type ServerConfig struct {
-	Port    int
-	Servlet *ServerServletConfig
-}
 
 type HttpServListener struct {
 	Logger     application.AppLoger        `FrameAutowired:""`
 	Dispatcher *event.FrameEventDispatcher `FrameAutowired:""`
+	SerConfig  *ServerConfig               `FrameValue:"${server}"`
 }
 
 func (h *HttpServListener) Starting(local *context.LocalStack) {
@@ -33,25 +29,13 @@ func (h *HttpServListener) EnvironmentPrepared(local *context.LocalStack, enviro
 }
 
 func (h *HttpServListener) Running(local *context.LocalStack, application *application.FrameApplicationContext) {
-	var setting *ServerConfig = &ServerConfig{}
-	application.Environment.GetObjectValue("server", setting)
-
-	if h.Logger.IsDebugEnable() {
-		s, _ := json.Marshal(setting)
-		h.Logger.Debug(local, "httpConfig %s", string(s))
-	}
-
-	DefaultServConfig = setting
-
-	var address string = fmt.Sprintf("%s:%d", "", setting.Port)
-	h.Logger.Info(local, "http开始监听 %s", address)
 
 	go func() {
 		l := context.NewLocalStack()
 		l.SetThread()
 
 		select {
-		case <-time.After(5 * time.Second):
+		case <-time.After(4 * time.Second):
 			h.Logger.Debug(l, "http事件初始化")
 		}
 
@@ -59,7 +43,19 @@ func (h *HttpServListener) Running(local *context.LocalStack, application *appli
 		h.Dispatcher.DispatchEvent(local, e)
 	}()
 
-	http.ListenAndServe(address, nil)
+	if application.CustomerStarter != nil {
+		h.Logger.Info(local, "http使用自带http初始化")
+		application.CustomerStarter.HttpStart(local, application)
+	} else {
+
+		for _, r := range GetDispatchServlet().GetRouteMapping() {
+			http.HandleFunc(r.Path, r.Handler)
+		}
+
+		var address string = fmt.Sprintf("%s:%d", "", h.SerConfig.Port)
+		h.Logger.Info(local, "http开始监听 %s", address)
+		http.ListenAndServe(address, nil)
+	}
 
 }
 

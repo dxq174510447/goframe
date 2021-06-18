@@ -607,16 +607,16 @@ func (s *sqlInvoke) invokeInsert(local *context.LocalStack, args []reflect.Value
 	if s.baseMethod && s.tableDef != nil && s.tableDef.IdColumn != nil &&
 		strings.ToUpper(s.tableDef.GenerationType) == "IDENTITY" {
 		// 这种情况 args[1] 就是entity
-		lid1, err2 := sqlResult.LastInsertId()
+		lid1, err3 := sqlResult.LastInsertId()
 
-		if err2 != nil {
+		if err3 != nil {
 			if errorFlag == 0 {
-				panic(err2)
+				panic(err3)
 			} else {
 				if s.returnSqlType != nil {
-					return []reflect.Value{*s.defaultReturnValue, reflect.ValueOf(err2)}
+					return []reflect.Value{*s.defaultReturnValue, reflect.ValueOf(err3)}
 				} else {
-					return []reflect.Value{reflect.ValueOf(err2)}
+					return []reflect.Value{reflect.ValueOf(err3)}
 				}
 			}
 		}

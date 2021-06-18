@@ -11,7 +11,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"reflect"
 	"strconv"
-	"time"
 )
 
 // dbRouter 关键字 对应的db源
@@ -128,34 +127,13 @@ func OpenSqlConnection(local *context2.LocalStack, readOnly int) *DatabaseConnec
 	}
 }
 
-func NewDatabase(c *DatabaseConfig, key string) *DatabaseInstance {
-	//user:password@tcp(localhost:5555)/dbname?characterEncoding=UTF-8
-	url := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=true&loc=Local",
-		c.DbUser, c.DbPwd, c.DbHost, c.DbPort, c.DbName,
-	)
-	db, _ := sql.Open("mysql", url)
-	db.SetConnMaxLifetime(time.Minute * 3)
-	db.SetMaxOpenConns(1000)
-	db.SetMaxIdleConns(20)
-
-	id := fmt.Sprintf("DbConnect_%s", key)
-
-	return &DatabaseInstance{
-		Db:     db,
-		Id:     id,
-		Config: c,
-	}
-}
-
 type DatabaseConfig struct {
-	DbUser    string
-	DbPwd     string
-	DbName    string
-	DbPort    string
-	DbHost    string
-	Prop      map[string]string
-	Proparray []string
-	// proxy 全局唯一
+	DbUser string
+	DbPwd  string
+	DbName string
+	DbPort string
+	DbHost string
+	Prop   map[string]string
 }
 
 type DatabaseInstance struct {
@@ -176,21 +154,58 @@ func (d *DatabaseFactory) ProxyTarget() *proxyclass.ProxyClass {
 	return nil
 }
 
+func (d *DatabaseFactory) NewDatabase(local *context2.LocalStack,
+	applicationContext *application.FrameApplicationContext,
+	c *DatabaseConfig, key string) *DatabaseInstance {
+
+	if d.Logger.IsDebugEnable() {
+		s, _ := json.Marshal(c)
+		d.Logger.Debug(local, "初始化db key %s--->%s", key, s)
+	}
+
+	//user:password@tcp(localhost:5555)/dbname?characterEncoding=UTF-8
+	url := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=true&loc=Local",
+		c.DbUser, c.DbPwd, c.DbHost, c.DbPort, c.DbName,
+	)
+	db, _ := sql.Open("mysql", url)
+	//db.SetConnMaxLifetime(time.Minute * 3)
+
+	var maxOpen int = 1000
+	var maxIdle int = 20
+
+	if c.Prop != nil {
+		if maxOpen1, ok := c.Prop[DbConfigMaxOpenConnsKey]; ok {
+			maxOpen, _ = strconv.Atoi(maxOpen1)
+		}
+
+		if maxIdle1, ok := c.Prop[DbConfigMaxIdleConnsKey]; ok {
+			maxIdle, _ = strconv.Atoi(maxIdle1)
+		}
+	}
+	db.SetMaxOpenConns(maxOpen)
+	db.SetMaxIdleConns(maxIdle)
+
+	id := fmt.Sprintf("DbConnect_%s", key)
+
+	instance := &DatabaseInstance{
+		Db:     db,
+		Id:     id,
+		Config: c,
+	}
+	AddDatabaseRouter(key, instance.Db)
+	applicationContext.FrameResource.ProxyInsPool.Push(&application.DynamicProxyInstanceNode{
+		Target: instance,
+		Id:     instance.Id,
+	})
+	return instance
+}
+
 func (d *DatabaseFactory) ProxyGet(local *context2.LocalStack, application1 *application.FrameApplication, applicationContext *application.FrameApplicationContext) proxyclass.ProxyTarger {
+
 	var setting map[string]*DatabaseConfig = make(map[string]*DatabaseConfig)
 	applicationContext.Environment.GetObjectValue("platform.datasource.config", setting)
-
-	s, _ := json.Marshal(setting)
-	d.Logger.Debug(local, "dbsetting--->%s", string(s))
-
 	for k, v := range setting {
-		db := NewDatabase(v, k)
-		AddDatabaseRouter(k, db.Db)
-
-		application1.FrameResource.ProxyInsPool.Push(&application.DynamicProxyInstanceNode{
-			Target: db,
-			Id:     db.Id,
-		})
+		d.NewDatabase(local, applicationContext, v, k)
 	}
 	return nil
 }

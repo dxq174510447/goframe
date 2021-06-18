@@ -16,6 +16,73 @@ import (
 	"strings"
 )
 
+type RouteMapping struct {
+	Path         string
+	Handler      func(http.ResponseWriter, *http.Request)
+	AbsolutePath bool
+}
+type ServerConfig struct {
+	Port    int
+	Servlet *ServerServletConfig
+}
+
+type HttpViewRender interface {
+	SuccessRender(local *context.LocalStack, controller *ControllerVar,
+		proxyMethod *proxyclass.ProxyMethod, methodRequestSetting *RestAnnotationSetting,
+		request *http.Request, response http.ResponseWriter, result interface{})
+	ErrorRender(local *context.LocalStack, controller *ControllerVar,
+		proxyMethod *proxyclass.ProxyMethod, methodRequestSetting *RestAnnotationSetting,
+		request *http.Request, response http.ResponseWriter, throwable interface{})
+}
+
+type DefaultHttpViewRender struct {
+}
+
+func (d *DefaultHttpViewRender) SuccessRender(local *context.LocalStack, controller *ControllerVar,
+	proxyMethod *proxyclass.ProxyMethod, methodRequestSetting *RestAnnotationSetting,
+	request *http.Request, response http.ResponseWriter, result interface{}) {
+
+	response.Header().Add("Content-Type", "application/json;charset=UTF-8")
+
+	var successJson *vo.JsonResult
+	if result != nil {
+		if reflect.TypeOf(result).Kind() == reflect.Slice {
+			successJson = util.JsonUtil.BuildJsonArraySuccess(result, -1)
+		} else {
+			successJson = util.JsonUtil.BuildJsonSuccess(result)
+		}
+	} else {
+		successJson = util.JsonUtil.BuildJsonSuccess(nil)
+	}
+	a, _ := json.Marshal(successJson)
+	response.Write(a)
+}
+
+func (d *DefaultHttpViewRender) ErrorRender(local *context.LocalStack, controller *ControllerVar,
+	proxyMethod *proxyclass.ProxyMethod, methodRequestSetting *RestAnnotationSetting,
+	request *http.Request, response http.ResponseWriter, throwable interface{}) {
+
+	response.Header().Add("Content-Type", "application/json;charset=UTF-8")
+
+	var errJson *vo.JsonResult
+	switch throwable.(type) {
+	case *exception.FrameException:
+		value, _ := throwable.(*exception.FrameException)
+		errJson = util.JsonUtil.BuildJsonFailure(value.Code, value.Message, nil)
+	case error:
+		err := throwable.(error)
+		tip := err.Error()
+		errJson = util.JsonUtil.BuildJsonFailure1(tip, nil)
+	default:
+		tip := fmt.Sprintln(throwable)
+		errJson = util.JsonUtil.BuildJsonFailure1(tip, nil)
+	}
+	a, _ := json.Marshal(errJson)
+	response.Write(a)
+}
+
+var defaultHttpViewRender DefaultHttpViewRender = DefaultHttpViewRender{}
+
 var DefaultServConfig *ServerConfig
 
 type RestAnnotationSetting struct {
@@ -48,6 +115,16 @@ type ControllerVar struct {
 }
 
 type DispatchServlet struct {
+	routeMapping []*RouteMapping
+	defaultView  HttpViewRender
+}
+
+func (d *DispatchServlet) SetDefaultView(view HttpViewRender) {
+	d.defaultView = view
+}
+
+func (d *DispatchServlet) GetRouteMapping() []*RouteMapping {
+	return d.routeMapping
 }
 
 func (d *DispatchServlet) Dispatch(local *context.LocalStack, request *http.Request, response http.ResponseWriter) {
@@ -56,14 +133,13 @@ func (d *DispatchServlet) Dispatch(local *context.LocalStack, request *http.Requ
 	var proxyMethod *proxyclass.ProxyMethod
 	var methodRequestSetting *RestAnnotationSetting
 
+	var returnError interface{}
 	defer func() {
 		if err := recover(); err != nil {
-			s := PrintStackTrace(err)
-			fmt.Println(s)
-			if methodRequestSetting.MethodRender == "" || methodRequestSetting.MethodRender == "json" {
-				d.renderExceptionJson(response, request, err)
-			}
-
+			returnError = err
+		}
+		if returnError != nil {
+			d.httpErrorRender(local, controller, proxyMethod, methodRequestSetting, request, response, returnError)
 		}
 	}()
 
@@ -165,41 +241,65 @@ func (d *DispatchServlet) Dispatch(local *context.LocalStack, request *http.Requ
 					}
 				}
 				param[i] = reflect.ValueOf(pvi)
+			case reflect.Int64:
+				pv := getParameterValueFromRequest(request, i, queryParameter, headerParameter, pathVariable, pathVariableValue)
+				var pvi int64 = 0
+				if pv != "" {
+					var err error
+					pvi, err = strconv.ParseInt(pv, 10, 64)
+					if err != nil {
+						panic(fmt.Errorf("string2int error"))
+					}
+				}
+				param[i] = reflect.ValueOf(pvi)
 			case reflect.Struct:
 				panic(fmt.Errorf("struct only ptr"))
 			}
 		}
 		result = methodInvoker.Call(param)
 	}
-	if len(result) == 1 && methodRequestSetting.MethodRender == "" || methodRequestSetting.MethodRender == "json" {
-		d.renderJson(response, request, result[0].Interface())
+
+	// 只能返回两个参数
+	var returnObject interface{}
+	if len(result) > 0 {
+		i := len(result) - 1
+		for ; i >= 0; i-- {
+			row := result[i]
+			if row.IsZero() {
+				continue
+			}
+			if row.Type().Implements(util.FrameErrorType) {
+				returnError = row.Interface()
+			} else {
+				returnObject = row.Interface()
+			}
+		}
+	}
+	if returnError == nil {
+		d.httpSuccessRender(local, controller, proxyMethod, methodRequestSetting, request, response, returnObject)
 	}
 
 }
 
-func (d *DispatchServlet) renderJson(response http.ResponseWriter, request *http.Request, result interface{}) {
-	response.Header().Add("Content-Type", "application/json;charset=UTF-8")
-	a, _ := json.Marshal(result)
-	response.Write(a)
-}
-func (d *DispatchServlet) renderExceptionJson(response http.ResponseWriter, request *http.Request, throwable interface{}) {
-
-	var errJson *vo.JsonResult
-	switch throwable.(type) {
-	case *exception.FrameException:
-		value, _ := throwable.(*exception.FrameException)
-		errJson = util.JsonUtil.BuildJsonFailure(value.Code, value.Message, nil)
-	default:
-		tip := fmt.Sprintln(throwable)
-		errJson = util.JsonUtil.BuildJsonFailure1(tip, nil)
-	}
-
-	response.Header().Add("Content-Type", "application/json;charset=UTF-8")
-	a, _ := json.Marshal(errJson)
-	response.Write(a)
+// httpSuccessRender result 存在为空情况
+func (d *DispatchServlet) httpSuccessRender(local *context.LocalStack, controller *ControllerVar,
+	proxyMethod *proxyclass.ProxyMethod,
+	methodRequestSetting *RestAnnotationSetting,
+	request *http.Request, response http.ResponseWriter, result interface{}) {
+	d.defaultView.SuccessRender(local, controller, proxyMethod, methodRequestSetting, request, response, result)
 }
 
-var dispatchServlet DispatchServlet = DispatchServlet{}
+func (d *DispatchServlet) httpErrorRender(local *context.LocalStack,
+	controller *ControllerVar,
+	proxyMethod *proxyclass.ProxyMethod,
+	methodRequestSetting *RestAnnotationSetting, request *http.Request,
+	response http.ResponseWriter, throwable interface{}) {
+	d.defaultView.ErrorRender(local, controller, proxyMethod, methodRequestSetting, request, response, throwable)
+}
+
+var dispatchServlet DispatchServlet = DispatchServlet{
+	defaultView: HttpViewRender(&defaultHttpViewRender),
+}
 
 func GetDispatchServlet() *DispatchServlet {
 	return &dispatchServlet
@@ -251,18 +351,27 @@ func AddControllerProxyTarget(target1 proxyclass.ProxyTarger) {
 		return func(response http.ResponseWriter, request *http.Request) {
 			local := context.NewLocalStack()
 			local.SetThread()
+			SetCurrentControllerInvoker(local, invoker1)
+
 			SetCurrentHttpRequest(local, request)
 			SetCurrentHttpResponse(local, response)
 
 			defer local.Destroy()
 
-			SetCurrentControllerInvoker(local, invoker1)
-
 			GetDefaultFilterChain().DoFilter(local, request, response)
 		}
 	}(invoker)
-	http.HandleFunc(prefix+"/", f) //前缀匹配
-	http.HandleFunc(prefix, f)     //绝对匹配
+	var f1 = &RouteMapping{
+		Path:         strings.TrimSpace(prefix + "/"),
+		Handler:      f,
+		AbsolutePath: false,
+	}
+	var f2 = &RouteMapping{
+		Path:         strings.TrimSpace(prefix),
+		Handler:      f,
+		AbsolutePath: true,
+	}
+	dispatchServlet.routeMapping = append(dispatchServlet.routeMapping, f1, f2)
 }
 
 // getParameterValueFromRequest 获取方法常规变量
@@ -345,4 +454,9 @@ type WebServletStartedEvent struct {
 
 func (w *WebServletStartedEvent) GetSource() interface{} {
 	return nil
+}
+
+func AddHttpViewRender(view HttpViewRender) {
+	core.AddClassProxy(view.(proxyclass.ProxyTarger))
+	GetDispatchServlet().SetDefaultView(view)
 }

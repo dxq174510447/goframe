@@ -11,7 +11,7 @@ import "github.com/dxq174510447/goframe/lib/frame/context"
 // appender 是往上叠加的
 
 type LogAppender interface {
-	AppendRow(local *context.LocalStack, config *LoggerConfig, row string, err error)
+	AppendRow(local *context.LocalStack, config *LoggerConfig, row string, err interface{})
 	AppenderKey() string
 	NewAppender(ele *LogAppenderXmlEle) LogAppender
 }

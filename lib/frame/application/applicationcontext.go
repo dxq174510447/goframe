@@ -17,6 +17,8 @@ type FrameApplicationContext struct {
 	AdapterMap    map[string]map[string]*DynamicProxyInstanceNode
 	FrameResource *ResourcePool
 	LogFactory    AppLogFactoryer
+	// 自定义http启动器
+	CustomerStarter HttpStarter
 }
 
 func (f *FrameApplicationContext) ProxyTarget() *proxyclass.ProxyClass {
@@ -87,10 +89,18 @@ type FrameApplication struct {
 	FrameResource *ResourcePool
 
 	LogFactory AppLogFactoryer
+
+	// 自定义http启动器
+	CustomerStarter HttpStarter
 }
 
 func (a *FrameApplication) AddApplicationContextListener(listener ApplicationContextListener) *FrameApplication {
 	a.ApplicationListeners = append(a.ApplicationListeners, listener)
+	return a
+}
+
+func (a *FrameApplication) HttpServ(starter HttpStarter) *FrameApplication {
+	a.CustomerStarter = starter
 	return a
 }
 
@@ -99,10 +109,10 @@ func (a *FrameApplication) Run(args []string) *FrameApplicationContext {
 	local := context.NewLocalStack()
 	local.SetThread()
 	var listeners *ApplicationRunContextListeners
-	var context *FrameApplicationContext
+	var context1 *FrameApplicationContext
 	defer func() {
 		if err := recover(); err != nil {
-			listeners.Failed(local, context, err)
+			listeners.Failed(local, context1, err)
 			local.Destroy()
 			panic(err)
 		}
@@ -136,13 +146,13 @@ func (a *FrameApplication) Run(args []string) *FrameApplicationContext {
 	// 初始化日志
 	a.PrepareLogFactory(local)
 
-	context = a.CreateApplicationContext(local)
+	context1 = a.CreateApplicationContext(local)
 
-	a.RefreshContext(local, context)
+	a.RefreshContext(local, context1)
 
-	listeners.Running(local, context)
+	listeners.Running(local, context1)
 
-	return context
+	return context1
 }
 
 // PrepareEnvironment 加载应用配置项
@@ -191,9 +201,10 @@ func (a *FrameApplication) CreateApplicationContext(local *context.LocalStack) *
 			Environment: a.Environment,
 			RefNode:     make(map[string]*InsValueInjectTreeNode),
 		},
-		AdapterMap:    make(map[string]map[string]*DynamicProxyInstanceNode),
-		FrameResource: a.FrameResource,
-		LogFactory:    a.LogFactory,
+		AdapterMap:      make(map[string]map[string]*DynamicProxyInstanceNode),
+		FrameResource:   a.FrameResource,
+		LogFactory:      a.LogFactory,
+		CustomerStarter: a.CustomerStarter,
 	}
 	AddProxyInstance("", proxyclass.ProxyTarger(applicationContext))
 	return applicationContext
@@ -210,10 +221,11 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 	}
 
 	current := pl.FirstElement
-	//injectTarget := make([]*DynamicProxyInstanceNode, 0, 30)
+
+	// 第一轮注入的时候 找不到对象 可能是factoryer还没生成 暂时只支持2轮
+	firstNilInject := make([]*DynamicProxyInstanceNode, 0, 30)
 
 	for current != nil {
-
 		if len(current.autowiredInjectField) > 0 || len(current.configInjectField) > 0 {
 			//injectTarget = append(injectTarget, current)
 			// 类型注入
@@ -237,6 +249,8 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 						if ele.Target != nil {
 							reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
 						}
+					} else {
+						firstNilInject = append(firstNilInject, current)
 					}
 				}
 			}
@@ -297,10 +311,37 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 		current = current.Next
 	}
 
-	//for _, target := range injectTarget {
-	//
-	//
-	//}
+	for _, ele1 := range firstNilInject {
+		if ele1 == nil {
+			continue
+		}
+		// 类型注入
+		for _, field := range ele1.autowiredInjectField {
+
+			// 特殊类型 日志类型注入 第一轮已经注入
+			if field.Type == FrameLogLoggerType {
+				continue
+			}
+
+			// 安类型 或者id注入
+			if key, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
+				// 字段值为空的话 第二轮注入
+				if reflect.ValueOf(ele1.Target).Elem().FieldByName(field.Name).IsZero() {
+					if key == "" {
+						key = util.ClassUtil.GetClassNameByType(field.Type.Elem())
+					}
+					if ele, ok1 := pl.ElementMap[key]; ok1 {
+						if ele.Target != nil {
+							reflect.ValueOf(ele1.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
+						}
+					} else {
+						//firstNilInject = append(firstNilInject,current)
+					}
+				}
+			}
+		}
+	}
+
 }
 
 // ConfigureEnvironment 加载配置文件

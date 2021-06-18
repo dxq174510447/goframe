@@ -20,6 +20,10 @@ type AppLogFactoryer interface {
 	GetLoggerString(className string) AppLoger
 }
 
+type HttpStarter interface {
+	HttpStart(local *context.LocalStack, applicationContext *FrameApplicationContext)
+}
+
 type AppLoger interface {
 	Trace(local *context.LocalStack, format string, a ...interface{})
 
@@ -37,7 +41,7 @@ type AppLoger interface {
 
 	IsWarnEnable() bool
 
-	Error(local *context.LocalStack, err error, format string, a ...interface{})
+	Error(local *context.LocalStack, err interface{}, format string, a ...interface{})
 
 	IsErrorEnable() bool
 }
@@ -182,6 +186,46 @@ type DynamicProxyLinkedArray struct {
 	ElementMap map[string]*DynamicProxyInstanceNode
 
 	LastElement *DynamicProxyInstanceNode
+}
+
+func (d *DynamicProxyLinkedArray) AddHead(node *DynamicProxyInstanceNode) {
+
+	if node.Target != nil {
+		target := node.Target
+		node.rt = reflect.TypeOf(target)
+		node.rv = reflect.ValueOf(target)
+		fieldNum := node.rt.Elem().NumField()
+		if fieldNum > 0 {
+			for i := 0; i < fieldNum; i++ {
+				field := node.rt.Elem().Field(i)
+				if _, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
+					node.autowiredInjectField = append(node.autowiredInjectField, &field)
+				}
+
+				if _, ok := field.Tag.Lookup(ValueInjectKey); ok {
+					node.configInjectField = append(node.configInjectField, &field)
+				}
+			}
+		}
+	}
+
+	if d.LastElement == nil {
+		d.LastElement = node
+	}
+
+	if d.FirstElement == nil {
+		d.FirstElement = node
+	} else {
+		oldFirst := d.FirstElement
+		node.Next = oldFirst
+		d.FirstElement = node
+	}
+
+	if d.ElementMap == nil {
+		d.ElementMap = make(map[string]*DynamicProxyInstanceNode)
+	}
+
+	d.ElementMap[node.Id] = node
 }
 
 func (d *DynamicProxyLinkedArray) Push(node *DynamicProxyInstanceNode) {

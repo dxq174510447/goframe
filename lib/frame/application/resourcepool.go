@@ -73,8 +73,8 @@ func AddProxyInstance(name string, instance proxyclass.ProxyTarger) {
 		Target: instance,
 		Id:     key,
 	}
-	resourcePool.ProxyInsPool.Push(node)
 
+	var hasAdd bool = false
 	t := reflect.TypeOf(instance)
 	for k, v := range resourcePool.RegisterType {
 		if t.Implements(v) {
@@ -83,7 +83,14 @@ func AddProxyInstance(name string, instance proxyclass.ProxyTarger) {
 			} else {
 				resourcePool.RegisterInsMap[k] = []*DynamicProxyInstanceNode{node}
 			}
+			if !hasAdd {
+				resourcePool.ProxyInsPool.AddHead(node)
+				hasAdd = true
+			}
 		}
+	}
+	if !hasAdd {
+		resourcePool.ProxyInsPool.Push(node)
 	}
 }
 

@@ -1,12 +1,15 @@
 package http
 
 import (
+	"encoding/json"
 	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 )
 
 type HttpControllerLoadStrategy struct {
+	Logger    application.AppLoger `FrameAutowired:""`
+	SerConfig *ServerConfig        `FrameValue:"${server}"`
 }
 
 func (h *HttpControllerLoadStrategy) LoadInstance(local *context.LocalStack, target1 *application.DynamicProxyInstanceNode,
@@ -27,6 +30,13 @@ func (h *HttpControllerLoadStrategy) LoadInstance(local *context.LocalStack, tar
 	if httpAnno == nil {
 		return false
 	}
+	if DefaultServConfig == nil {
+		if h.Logger.IsDebugEnable() {
+			s, _ := json.Marshal(h.SerConfig)
+			h.Logger.Debug(local, "httpConfig %s", string(s))
+		}
+		DefaultServConfig = h.SerConfig
+	}
 	AddControllerProxyTarget(target)
 	return true
 }
@@ -40,10 +50,6 @@ func (h *HttpControllerLoadStrategy) ProxyTarget() *proxyclass.ProxyClass {
 }
 
 var httpControllerLoadStrategy HttpControllerLoadStrategy = HttpControllerLoadStrategy{}
-
-func GetHttpControllerLoadStrategy() *HttpControllerLoadStrategy {
-	return &httpControllerLoadStrategy
-}
 
 type HttpFilterLoadStrategy struct {
 }
@@ -73,11 +79,36 @@ func (h *HttpFilterLoadStrategy) ProxyTarget() *proxyclass.ProxyClass {
 
 var httpFilterLoadStrategy HttpFilterLoadStrategy = HttpFilterLoadStrategy{}
 
-func GetHttpFilterLoadStrategy() *HttpFilterLoadStrategy {
-	return &httpFilterLoadStrategy
+type HttpComponentLoadStrategy struct {
 }
+
+func (h *HttpComponentLoadStrategy) LoadInstance(local *context.LocalStack, target1 *application.DynamicProxyInstanceNode,
+	application *application.FrameApplication,
+	applicationContext *application.FrameApplicationContext) bool {
+
+	if target1 == nil {
+		return false
+	}
+	target := target1.Target
+	if f, ok := target.(HttpViewRender); ok {
+		AddHttpViewRender(f)
+		return true
+	}
+	return false
+}
+
+func (h *HttpComponentLoadStrategy) Order() int {
+	return 80
+}
+
+func (h *HttpComponentLoadStrategy) ProxyTarget() *proxyclass.ProxyClass {
+	return nil
+}
+
+var httpComponentLoadStrategy HttpComponentLoadStrategy = HttpComponentLoadStrategy{}
 
 func init() {
 	application.AddProxyInstance("", proxyclass.ProxyTarger(&httpControllerLoadStrategy))
 	application.AddProxyInstance("", proxyclass.ProxyTarger(&httpFilterLoadStrategy))
+	application.AddProxyInstance("", proxyclass.ProxyTarger(&httpComponentLoadStrategy))
 }

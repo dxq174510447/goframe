@@ -45,7 +45,7 @@ type LogMessage struct {
 	Line     string
 	FileName string
 	Msg      string
-	Err      error
+	Err      interface{}
 	Thread   string
 	Date     time.Time
 }
@@ -56,7 +56,8 @@ type PatternLayout struct {
 	Target          io.Writer
 }
 
-func (p *PatternLayout) DoLayout(local *context.LocalStack, config *logclass.LoggerConfig, row string, err error) {
+// err可nil
+func (p *PatternLayout) DoLayout(local *context.LocalStack, config *logclass.LoggerConfig, row string, err interface{}) {
 	msg := &LogMessage{
 		Name:  config.Name,
 		Level: config.Level,
@@ -294,7 +295,7 @@ func (c *ConsoleAppenderImpl) NewAppender(ele *logclass.LogAppenderXmlEle) logcl
 	return logclass.LogAppender(result)
 }
 
-func (c *ConsoleAppenderImpl) AppendRow(local *context.LocalStack, config *logclass.LoggerConfig, row string, err error) {
+func (c *ConsoleAppenderImpl) AppendRow(local *context.LocalStack, config *logclass.LoggerConfig, row string, err interface{}) {
 	c.Layout.DoLayout(local, config, row, err)
 	os.Stdout.Sync()
 }
@@ -395,7 +396,7 @@ func (l *Logger) IsWarnEnable() bool {
 	return l.isLevelEnable(WARNLevel, l.Config)
 }
 
-func (l *Logger) Error(local *context.LocalStack, err error, format string, a ...interface{}) {
+func (l *Logger) Error(local *context.LocalStack, err interface{}, format string, a ...interface{}) {
 	if !l.IsErrorEnable() {
 		return
 	}

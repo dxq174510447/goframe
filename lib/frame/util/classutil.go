@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+var FrameErrorType reflect.Type = reflect.Zero(reflect.TypeOf((*error)(nil)).Elem()).Type()
+
 type classUtil struct {
 }
 

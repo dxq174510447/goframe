@@ -27,6 +27,9 @@ const (
 	MapperErrorHandlerFlagKey = "MapperErrorHandlerFlagKey_"
 	DataBaseTxKey             = "DataBaseTxKey_"
 	DataBaseRouteKey          = "DataBaseRouteKey_"
+
+	DbConfigMaxOpenConnsKey = "DbConfigMaxOpenConnsKey_"
+	DbConfigMaxIdleConnsKey = "DbConfigMaxIdleConnsKey_"
 )
 
 const (
