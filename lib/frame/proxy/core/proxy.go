@@ -192,6 +192,7 @@ func proxyStructFuncField(target proxyclass.ProxyTarger,
 		// currentTargetValue is ptr
 		fieldValue := currentTargetValue.Elem().FieldByName(field.Name)
 		fieldType, _ := currentTargetType.FieldByName(field.Name)
+		fmt.Println("----->", field.Name)
 		if pt, ok := fieldValue.Addr().Interface().(proxyclass.ProxyTarger); ok {
 			if m1 := fieldType.Type.NumField(); m1 > 0 {
 
