@@ -6,6 +6,7 @@ import (
 	"github.com/dxq174510447/goframe/lib/frame/db/dbcore"
 	"github.com/dxq174510447/goframe/lib/frame/log/logclass"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
+	"github.com/dxq174510447/goframe/lib/frame/util"
 	"reflect"
 )
 
@@ -19,16 +20,19 @@ func (d *TxRequireNewProxyFilter) Execute(context *context.LocalStack,
 	invoker *reflect.Value,
 	arg []reflect.Value, next *proxyclass.ProxyFilterWrapper) []reflect.Value {
 
-	if d.Logger.IsTraceEnable() {
-		d.Logger.Trace(context, "%s", "TxRequireNewProxyFilter begin")
-		defer d.Logger.Trace(context, "%s", "TxRequireNewProxyFilter end")
+	var key string = "线程DB事物检查[PROPAGATION_REQUIRES_NEW]"
+
+	if d.Logger.IsDebugEnable() {
+		d.Logger.Debug(context, "%s begin", key)
+		defer d.Logger.Debug(context, "%s end", key)
 	}
 
-	// 无论线程变量中有没有连接都创建一个新的
-	con := dbcore.OpenSqlConnection(context, 0)
-	d.Logger.Trace(context, "当前线程初始化新的 connectionId %s", con.ConnectId)
+	var returnError interface{}
+	var errorType int = 1 // 错误类型 1返回错误 2panic错误
 
-	// 将当前新的连接放入新的local变量中
+	con := dbcore.OpenSqlConnection(context, 0)
+	d.Logger.Debug(context, "%s 当前线程初始化新的 connectionId %s 并开启事物", key, con.ConnectId)
+
 	context.Push()
 	dbcore.SetDbConnection(context, con) //连接不用释放 close方法没用
 
@@ -36,28 +40,33 @@ func (d *TxRequireNewProxyFilter) Execute(context *context.LocalStack,
 	con.BeginTransaction()
 
 	defer func() {
-
 		if err := recover(); err != nil {
 			// 如果失败 回滚 继续往上抛错
+			errorType = 2
+			returnError = err
+		}
+		if returnError != nil {
+			d.Logger.Debug(context, "%s 当前线程连接 connectionId %s 发生错误类型%d 回滚", key, con.ConnectId, errorType)
 			con.Rollback()
-
 			con.Close()
-			// 去除新的local变量
 			context.Pop()
-
-			panic(err)
+			if errorType == 2 {
+				panic(returnError)
+			}
 		} else {
-			// 没有错误 就提交
+			d.Logger.Debug(context, "%s 当前线程连接 connectionId %s 提交事物", key, con.ConnectId)
 			con.Commit()
-
 			con.Close()
-			// 去除新的local变量
 			context.Pop()
 		}
 	}()
 
-	return next.Execute(context, classInfo, methodInfo, invoker, arg)
-
+	result := next.Execute(context, classInfo, methodInfo, invoker, arg)
+	resultError := util.ClassUtil.GetErrorValueFromResult(result)
+	if resultError != nil {
+		returnError = resultError.Interface()
+	}
+	return result
 }
 
 func (d *TxRequireNewProxyFilter) Order() int {

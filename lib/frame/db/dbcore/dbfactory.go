@@ -42,8 +42,10 @@ type DatabaseConnection struct {
 	ConnectId   string
 }
 
+// Close 释放连接
 func (d *DatabaseConnection) Close() {
 	//不用释放
+	d.Con.Close()
 }
 
 func (d *DatabaseConnection) BeginTransaction() {

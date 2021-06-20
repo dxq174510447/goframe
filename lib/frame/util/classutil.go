@@ -11,6 +11,26 @@ var FrameErrorType reflect.Type = reflect.Zero(reflect.TypeOf((*error)(nil)).Ele
 type classUtil struct {
 }
 
+func (c *classUtil) GetErrorValueFromResult(result []reflect.Value) *reflect.Value {
+	if len(result) == 0 {
+		return nil
+	}
+	var returnError *reflect.Value
+	// 从后往前
+	i := len(result) - 1
+	for ; i >= 0; i-- {
+		row := result[i]
+		if row.IsZero() {
+			continue
+		}
+		if row.Type().Implements(FrameErrorType) {
+			returnError = &row
+			break
+		}
+	}
+	return returnError
+}
+
 //GetClassName 用来获取struct的全路径 传递指针
 func (c *classUtil) GetClassName(target interface{}) string {
 	t := reflect.ValueOf(target).Elem().Type()

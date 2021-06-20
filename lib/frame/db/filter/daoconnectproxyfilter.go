@@ -19,25 +19,25 @@ func (d *DaoConnectProxyFilter) Execute(context *context.LocalStack,
 	invoker *reflect.Value,
 	arg []reflect.Value, next *proxyclass.ProxyFilterWrapper) []reflect.Value {
 
-	if d.Logger.IsTraceEnable() {
-		d.Logger.Trace(context, "%s", "DaoConnectProxyFilter begin")
-		defer d.Logger.Trace(context, "%s", "DaoConnectProxyFilter end ")
+	var key string = "线程DB连接检查"
+	if d.Logger.IsDebugEnable() {
+		d.Logger.Debug(context, "%s begin", key)
+		defer d.Logger.Debug(context, "%s end", key)
 	}
 
 	dbcon := dbcore.GetDbConnection(context)
 
 	if dbcon != nil {
-		d.Logger.Trace(context, "当前线程检测到dbconn connectid %s", dbcon.ConnectId)
-	}
-
-	if dbcon == nil {
+		d.Logger.Debug(context, "%s 当前线程检测到dbconn connectid %s", key, dbcon.ConnectId)
+	} else {
 		con := dbcore.OpenSqlConnection(context, 0)
-		d.Logger.Debug(context, "当前线程未检测到dbconn 初始化之后 connectid %s", con.ConnectId)
+		d.Logger.Debug(context, "%s 当前线程未检测到dbconn 新建的连接 connectid %s", key, con.ConnectId)
 
 		context.Push()
 		dbcore.SetDbConnection(context, con) //连接不用释放 close方法没用
 
 		defer func() {
+			// 在这里创建的连接 不管结果成功或者失败 以何种方式失败 都释放连接
 			con.Close()
 			context.Pop()
 		}()
