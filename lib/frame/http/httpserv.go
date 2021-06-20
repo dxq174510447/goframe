@@ -5,6 +5,7 @@ import (
 	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/event"
+	"github.com/dxq174510447/goframe/lib/frame/log/logclass"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"net/http"
 	"time"
@@ -15,7 +16,7 @@ type ServerServletConfig struct {
 }
 
 type HttpServListener struct {
-	Logger     application.AppLoger        `FrameAutowired:""`
+	Logger     logclass.AppLoger           `FrameAutowired:""`
 	Dispatcher *event.FrameEventDispatcher `FrameAutowired:""`
 	SerConfig  *ServerConfig               `FrameValue:"${server}"`
 }
@@ -49,6 +50,7 @@ func (h *HttpServListener) Running(local *context.LocalStack, application *appli
 	} else {
 
 		for _, r := range GetDispatchServlet().GetRouteMapping() {
+			h.Logger.Debug(local, "http路径和处理控制器 %s  %s", r.Path, r.Invoker.Target.ProxyTarget().Name)
 			http.HandleFunc(r.Path, r.Handler)
 		}
 

@@ -3,6 +3,7 @@ package application
 import (
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/context"
+	"github.com/dxq174510447/goframe/lib/frame/log/logclass"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/core"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"github.com/dxq174510447/goframe/lib/frame/util"
@@ -16,9 +17,10 @@ type FrameApplicationContext struct {
 	ValueBindTree *InsValueInjectTree
 	AdapterMap    map[string]map[string]*DynamicProxyInstanceNode
 	FrameResource *ResourcePool
-	LogFactory    AppLogFactoryer
+	LogFactory    logclass.AppLogFactoryer
 	// 自定义http启动器
 	CustomerStarter HttpStarter
+	logger          logclass.AppLoger
 }
 
 func (f *FrameApplicationContext) ProxyTarget() *proxyclass.ProxyClass {
@@ -88,10 +90,17 @@ type FrameApplication struct {
 
 	FrameResource *ResourcePool
 
-	LogFactory AppLogFactoryer
+	LogFactory logclass.AppLogFactoryer
 
 	// 自定义http启动器
 	CustomerStarter HttpStarter
+
+	// 在日志初始化之前 记录下需要打印到日志
+	// 后续是否修改成 打印日志就初始化，等资源加载完在变更日志配置 TODO 1
+	logs []string
+
+	// 只有在日志初始化之后才能使用 结合logs
+	logger logclass.AppLoger
 }
 
 func (a *FrameApplication) AddApplicationContextListener(listener ApplicationContextListener) *FrameApplication {
@@ -146,6 +155,14 @@ func (a *FrameApplication) Run(args []string) *FrameApplicationContext {
 	// 初始化日志
 	a.PrepareLogFactory(local)
 
+	if a.logger == nil {
+		a.logger = a.LogFactory.GetLoggerType(reflect.TypeOf(a).Elem())
+	}
+
+	for _, m := range a.logs {
+		a.logger.Debug(local, m)
+	}
+
 	context1 = a.CreateApplicationContext(local)
 
 	a.RefreshContext(local, context1)
@@ -174,10 +191,11 @@ func (a *FrameApplication) PrepareEnvironment(local *context.LocalStack,
 
 	// 记载启动配置文件
 	a.ConfigureEnvironment(local, c, appArgs)
-
+	a.logs = append(a.logs, fmt.Sprintf("[初始化] 资源配置 加载完成"))
 	// 全局事件
 	listeners.EnvironmentPrepared(local, c)
 
+	a.logs = append(a.logs, fmt.Sprintf("[初始化] 资源配置 重建索引"))
 	c.ConfigTree.ReIndex()
 
 	//var m []string=make([]string,0,len(c.ConfigTree.RefNode))
@@ -205,6 +223,7 @@ func (a *FrameApplication) CreateApplicationContext(local *context.LocalStack) *
 		FrameResource:   a.FrameResource,
 		LogFactory:      a.LogFactory,
 		CustomerStarter: a.CustomerStarter,
+		logger:          a.LogFactory.GetLoggerType(reflect.TypeOf(a).Elem()),
 	}
 	AddProxyInstance("", proxyclass.ProxyTarger(applicationContext))
 	return applicationContext
@@ -226,6 +245,7 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 	firstNilInject := make([]*DynamicProxyInstanceNode, 0, 30)
 
 	for current != nil {
+		a.logger.Debug(local, "[初始化] 实例加载 %s %s 开始", current.Id, util.ClassUtil.GetJavaClassNameByType(current.rt.Elem()))
 		if len(current.autowiredInjectField) > 0 || len(current.configInjectField) > 0 {
 			//injectTarget = append(injectTarget, current)
 			// 类型注入
@@ -233,6 +253,7 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 
 				// 特殊类型 日志类型注入
 				if field.Type == FrameLogLoggerType {
+					a.logger.Debug(local, "[初始化] 实例加载 %s %s 日志注入", current.Id, field.Name)
 					if a.LogFactory != nil {
 						logger := a.LogFactory.GetLoggerType(current.rt.Elem())
 						reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(logger))
@@ -247,6 +268,7 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 					}
 					if ele, ok1 := pl.ElementMap[key]; ok1 {
 						if ele.Target != nil {
+							a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", current.Id, field.Name, ele.Id)
 							reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
 						}
 					} else {
@@ -278,6 +300,7 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 					} else {
 						applicationContext.ValueBindTree.SetBindValue(current, field, "", key)
 					}
+					a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入配置", current.Id, field.Name)
 				}
 			}
 		}
@@ -287,6 +310,8 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 			for _, strategy := range a.LoadStrategy {
 				add = strategy.LoadInstance(local, current, a, applicationContext)
 				if add {
+					a.logger.Debug(local, "[初始化] 自定义加载 加载器 %s 加载 %s",
+						util.ClassUtil.GetJavaClassNameByType(reflect.TypeOf(reflect.ValueOf(strategy).Elem().Interface())), current.Id)
 					break
 				}
 			}
@@ -332,6 +357,7 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 					}
 					if ele, ok1 := pl.ElementMap[key]; ok1 {
 						if ele.Target != nil {
+							a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", current.Id, field.Name, ele.Id)
 							reflect.ValueOf(ele1.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
 						}
 					} else {
@@ -362,10 +388,10 @@ func (a *FrameApplication) ConfigureEnvironment(local *context.LocalStack,
 
 	for _, f := range files {
 		if c, ok := GetResourcePool().ConfigMap[f]; ok {
-			fmt.Printf(" 加载配置文件 %s\n", f)
 			environment.Parse(c)
+			a.logs = append(a.logs, fmt.Sprintf("[初始化] 资源配置 %s 解析并加载", f))
 		} else {
-			fmt.Printf(" 配置文件不存在资源中 %s\n", f)
+			a.logs = append(a.logs, fmt.Sprintf("[初始化] 资源配置 %s 找不到对应配置文件", f))
 		}
 	}
 
@@ -375,10 +401,10 @@ func (a *FrameApplication) ConfigureEnvironment(local *context.LocalStack,
 		fs := strings.Split(fileinclude, ",")
 		for _, f := range fs {
 			if c, ok := GetResourcePool().ConfigMap[f]; ok {
-				fmt.Printf(" 加载配置文件 %s\n", f)
 				environment.Parse(c)
+				a.logs = append(a.logs, fmt.Sprintf("[初始化] 资源配置 %s 解析并加载", f))
 			} else {
-				fmt.Printf(" 配置文件不存在资源中 %s\n", f)
+				a.logs = append(a.logs, fmt.Sprintf("[初始化] 资源配置 %s 找不到对应配置文件", f))
 			}
 		}
 	}
@@ -404,12 +430,14 @@ func (a *FrameApplication) PrepareLogFactory(local *context.LocalStack) {
 	funcMap := a.Environment.GetTplFuncMap()
 	for _, f := range files {
 		if c, ok := GetResourcePool().LogConfigMap[f]; ok {
-			fmt.Printf(" 加载日志配置文件 %s\n", f)
 			a.LogFactory.Parse(c, funcMap)
+			a.logs = append(a.logs, fmt.Sprintf("[初始化] 日志配置 %s 解析并加载", f))
 		} else {
-			fmt.Printf(" 日志配置文件不存在资源中 %s\n", f)
+			a.logs = append(a.logs, fmt.Sprintf("[初始化] 日志配置 %s 找不到对应配置文件", f))
 		}
 	}
+
+	a.logs = append(a.logs, fmt.Sprintf("[初始化] 日志配置 加载完成"))
 }
 
 func NewApplication(main interface{}) *FrameApplication {
@@ -428,10 +456,10 @@ func NewApplication(main interface{}) *FrameApplication {
 		}
 	}
 
-	var logFactory AppLogFactoryer
+	var logFactory logclass.AppLogFactoryer
 	if arr, ok := GetResourcePool().RegisterInsMap[FrameLogFactoryerTypeName]; ok {
 		if len(arr) > 0 {
-			logFactory = arr[0].Target.(AppLogFactoryer)
+			logFactory = arr[0].Target.(logclass.AppLogFactoryer)
 		}
 	}
 

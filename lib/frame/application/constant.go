@@ -2,6 +2,7 @@ package application
 
 import (
 	"github.com/dxq174510447/goframe/lib/frame/context"
+	"github.com/dxq174510447/goframe/lib/frame/log/logclass"
 	"github.com/dxq174510447/goframe/lib/frame/util"
 	"reflect"
 )
@@ -30,10 +31,10 @@ var ApplicationContextListenerTypeName string = util.ClassUtil.GetClassNameByTyp
 var FrameLoadInstanceHandlerType reflect.Type = reflect.Zero(reflect.TypeOf((*FrameLoadInstanceHandler)(nil)).Elem()).Type()
 var FrameLoadInstanceHandlerTypeName string = util.ClassUtil.GetClassNameByType(FrameLoadInstanceHandlerType)
 
-var FrameLogFactoryerType reflect.Type = reflect.Zero(reflect.TypeOf((*AppLogFactoryer)(nil)).Elem()).Type()
+var FrameLogFactoryerType reflect.Type = reflect.Zero(reflect.TypeOf((*logclass.AppLogFactoryer)(nil)).Elem()).Type()
 var FrameLogFactoryerTypeName string = util.ClassUtil.GetClassNameByType(FrameLogFactoryerType)
 
-var FrameLogLoggerType reflect.Type = reflect.Zero(reflect.TypeOf((*AppLoger)(nil)).Elem()).Type()
+var FrameLogLoggerType reflect.Type = reflect.Zero(reflect.TypeOf((*logclass.AppLoger)(nil)).Elem()).Type()
 
 func SetEnvironmentToApplication(local *context.LocalStack, env *ConfigurableEnvironment) {
 	local.Set(FrameEnvironmentKey, env)

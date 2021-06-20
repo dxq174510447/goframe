@@ -2,6 +2,8 @@ package logclass
 
 import "github.com/dxq174510447/goframe/lib/frame/context"
 
+// logback相关
+
 //Logger, Appenders and Layouts
 //the Appender and Layout interfaces are part
 // (TRACE, DEBUG, INFO, WARN and ERROR)

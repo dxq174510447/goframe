@@ -3,6 +3,7 @@ package event
 import (
 	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
+	"github.com/dxq174510447/goframe/lib/frame/log/logclass"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"github.com/dxq174510447/goframe/lib/frame/util"
 	"reflect"
@@ -24,7 +25,7 @@ type FrameListener interface {
 type FrameEventDispatcher struct {
 	listeners map[string][]FrameListener
 
-	Logger application.AppLoger `FrameAutowired:""`
+	Logger logclass.AppLoger `FrameAutowired:""`
 }
 
 func (f *FrameEventDispatcher) DispatchEvent(local *context.LocalStack, event FrameEventer) {

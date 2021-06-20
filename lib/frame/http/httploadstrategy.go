@@ -1,15 +1,14 @@
 package http
 
 import (
-	"encoding/json"
 	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
+	"github.com/dxq174510447/goframe/lib/frame/log/logclass"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 )
 
 type HttpControllerLoadStrategy struct {
-	Logger    application.AppLoger `FrameAutowired:""`
-	SerConfig *ServerConfig        `FrameValue:"${server}"`
+	Logger logclass.AppLoger `FrameAutowired:""`
 }
 
 func (h *HttpControllerLoadStrategy) LoadInstance(local *context.LocalStack, target1 *application.DynamicProxyInstanceNode,
@@ -30,14 +29,7 @@ func (h *HttpControllerLoadStrategy) LoadInstance(local *context.LocalStack, tar
 	if httpAnno == nil {
 		return false
 	}
-	if DefaultServConfig == nil {
-		if h.Logger.IsDebugEnable() {
-			s, _ := json.Marshal(h.SerConfig)
-			h.Logger.Debug(local, "httpConfig %s", string(s))
-		}
-		DefaultServConfig = h.SerConfig
-	}
-	AddControllerProxyTarget(target)
+	GetFrameHttpFactory().AddControllerProxyTarget(local, target, applicationContext)
 	return true
 }
 

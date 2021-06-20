@@ -430,12 +430,12 @@ type LogFactory struct {
 	RefMap   map[string]*logclass.LoggerConfig
 }
 
-func (l *LogFactory) GetLoggerType(p reflect.Type) application.AppLoger {
+func (l *LogFactory) GetLoggerType(p reflect.Type) logclass.AppLoger {
 	name := util.ClassUtil.GetJavaClassNameByType(p)
 	return l.GetLoggerString(name)
 }
 
-func (l *LogFactory) GetLoggerString(name string) application.AppLoger {
+func (l *LogFactory) GetLoggerString(name string) logclass.AppLoger {
 	var node *logclass.LoggerConfig
 	if config, ok := l.RefMap[name]; ok {
 		node = config

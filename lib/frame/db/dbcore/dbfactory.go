@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/application"
 	context2 "github.com/dxq174510447/goframe/lib/frame/context"
+	"github.com/dxq174510447/goframe/lib/frame/log/logclass"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	_ "github.com/go-sql-driver/mysql"
 	"reflect"
@@ -147,7 +148,7 @@ func (d *DatabaseInstance) ProxyTarget() *proxyclass.ProxyClass {
 }
 
 type DatabaseFactory struct {
-	Logger application.AppLoger `FrameAutowired:""`
+	Logger logclass.AppLoger `FrameAutowired:""`
 }
 
 func (d *DatabaseFactory) ProxyTarget() *proxyclass.ProxyClass {

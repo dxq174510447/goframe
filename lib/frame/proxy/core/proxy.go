@@ -184,15 +184,23 @@ func proxyStructFuncField(target proxyclass.ProxyTarger,
 	currentTargetMethod map[string]*proxyclass.ProxyMethod,
 	field *reflect.StructField) {
 
+	// 字段不是大写不设置
+	if !util.StringUtil.IsFirstCharUpperCase(field.Name) {
+		return
+	}
+
 	var isproxyfield bool = false
 	if field.Type.Kind() == reflect.Func {
+		// 如果字段是fun 默认使用代理
 		isproxyfield = true
 	} else if field.Type.Kind() == reflect.Struct {
-		//fmt.Println(field.Type.Kind(),field.Name
+		// 如果字段是struct，1. 内嵌代理对象-不支持 2. 混合代理对象-支持(反射使用手法类似内嵌)  3. 内嵌非需要代理对象-不支持
 		// currentTargetValue is ptr
+
+		// bug1 字段名以小写开头点时候 这里会获取不到值
 		fieldValue := currentTargetValue.Elem().FieldByName(field.Name)
 		fieldType, _ := currentTargetType.FieldByName(field.Name)
-		fmt.Println("----->", field.Name)
+
 		if pt, ok := fieldValue.Addr().Interface().(proxyclass.ProxyTarger); ok {
 			if m1 := fieldType.Type.NumField(); m1 > 0 {
 

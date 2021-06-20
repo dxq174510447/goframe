@@ -3,10 +3,12 @@ package dbcore
 import (
 	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
+	"github.com/dxq174510447/goframe/lib/frame/log/logclass"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 )
 
 type DaoLoadStrategy struct {
+	Logger logclass.AppLoger `FrameAutowired:""`
 }
 
 func (h *DaoLoadStrategy) LoadInstance(local *context.LocalStack, target1 *application.DynamicProxyInstanceNode,
@@ -27,7 +29,8 @@ func (h *DaoLoadStrategy) LoadInstance(local *context.LocalStack, target1 *appli
 	if daoAnno == nil {
 		return false
 	}
-	AddMapperProxyTarget(local, target, applicationContext)
+	h.Logger.Debug(local, "[初始化] Dao解析 %s", target1.Id)
+	GetFrameOrmFactory().AddMapperProxyTarget(local, target, applicationContext)
 	return true
 }
 

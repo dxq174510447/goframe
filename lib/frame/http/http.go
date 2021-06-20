@@ -3,8 +3,10 @@ package http
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/exception"
+	"github.com/dxq174510447/goframe/lib/frame/log/logclass"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/core"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"github.com/dxq174510447/goframe/lib/frame/util"
@@ -14,12 +16,14 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type RouteMapping struct {
 	Path         string
 	Handler      func(http.ResponseWriter, *http.Request)
 	AbsolutePath bool
+	Invoker      *ControllerVar
 }
 type ServerConfig struct {
 	Port    int
@@ -117,6 +121,23 @@ type ControllerVar struct {
 type DispatchServlet struct {
 	routeMapping []*RouteMapping
 	defaultView  HttpViewRender
+	logger       logclass.AppLoger
+	lock         sync.Mutex
+}
+
+func (d *DispatchServlet) initDispatchServlet(local *context.LocalStack,
+	applicationContext *application.FrameApplicationContext) {
+	if d.logger != nil {
+		return
+	}
+	d.lock.Lock()
+	defer func() {
+		d.lock.Unlock()
+	}()
+	if d.logger != nil {
+		return
+	}
+	d.logger = applicationContext.LogFactory.GetLoggerType(reflect.TypeOf(d).Elem())
 }
 
 func (d *DispatchServlet) SetDefaultView(view HttpViewRender) {
@@ -169,6 +190,18 @@ func (d *DispatchServlet) Dispatch(local *context.LocalStack, request *http.Requ
 		}
 	}
 
+	if d.logger.IsDebugEnable() {
+		if proxyMethod == nil {
+			d.logger.Error(local, nil, "请求路径 %s 控制器 %s 处理方法 %s", url,
+				util.ClassUtil.GetJavaClassNameByType(reflect.ValueOf(controller.Target).Elem().Type()),
+				"nil")
+		} else {
+			d.logger.Debug(local, "请求路径 %s 控制器 %s 处理方法 %s", url,
+				util.ClassUtil.GetJavaClassNameByType(reflect.ValueOf(controller.Target).Elem().Type()),
+				proxyMethod.Name)
+		}
+	}
+
 	// proxyMethod== nil 404 TODO
 
 	methodRequestSetting = GetRequestAnnotationSetting(proxyMethod.Annotations)
@@ -197,10 +230,16 @@ func (d *DispatchServlet) Dispatch(local *context.LocalStack, request *http.Requ
 		param := make([]reflect.Value, paramlen)
 		for i := 0; i < paramlen; i++ {
 			pt := methodInvoker.Type().In(i)
-			if pt.Kind() == reflect.Ptr {
-				fmt.Println("method--->", pt.Elem().Name())
-			} else {
-				fmt.Println("method--->", pt.Name())
+			//if pt.Kind() == reflect.Ptr {
+			//	fmt.Println("method--->", pt.Elem().Name())
+			//} else {
+			//	fmt.Println("method--->", pt.Name())
+			//}
+			if d.logger.IsDebugEnable() {
+				d.logger.Debug(local, "请求路径 %s 控制器 %s 处理方法 %s 第 %d 参数类型 %s", url,
+					util.ClassUtil.GetJavaClassNameByType(reflect.ValueOf(controller.Target).Elem().Type()),
+					proxyMethod.Name, i,
+					util.ClassUtil.GetJavaClassNameByType(pt))
 			}
 
 			switch pt.Kind() {
@@ -215,9 +254,17 @@ func (d *DispatchServlet) Dispatch(local *context.LocalStack, request *http.Requ
 
 					body, err := ioutil.ReadAll(request.Body)
 					if err != nil {
+						d.logger.Error(local, nil, "请求路径 %s 控制器 %s 处理方法 %s 第 %d 参数类型 %s 获取requestbody失败", url,
+							util.ClassUtil.GetJavaClassNameByType(reflect.ValueOf(controller.Target).Elem().Type()),
+							proxyMethod.Name, i,
+							util.ClassUtil.GetJavaClassNameByType(pt))
 						panic(fmt.Errorf("read requestbody error"))
 					}
 					if len(body) == 0 {
+						d.logger.Error(local, nil, "请求路径 %s 控制器 %s 处理方法 %s 第 %d 参数类型 %s 获取requestbody失败", url,
+							util.ClassUtil.GetJavaClassNameByType(reflect.ValueOf(controller.Target).Elem().Type()),
+							proxyMethod.Name, i,
+							util.ClassUtil.GetJavaClassNameByType(pt))
 						panic(fmt.Errorf("read requestbody empty"))
 					}
 					json.Unmarshal(body, ntpr)
@@ -229,9 +276,23 @@ func (d *DispatchServlet) Dispatch(local *context.LocalStack, request *http.Requ
 				}
 			case reflect.String:
 				pv := getParameterValueFromRequest(request, i, queryParameter, headerParameter, pathVariable, pathVariableValue)
+
+				if d.logger.IsDebugEnable() {
+					d.logger.Debug(local, "请求路径 %s 控制器 %s 处理方法 %s 第 %d 参数类型 %s 值 %s", url,
+						util.ClassUtil.GetJavaClassNameByType(reflect.ValueOf(controller.Target).Elem().Type()),
+						proxyMethod.Name, i,
+						util.ClassUtil.GetJavaClassNameByType(pt), pv)
+				}
+
 				param[i] = reflect.ValueOf(pv)
 			case reflect.Int:
 				pv := getParameterValueFromRequest(request, i, queryParameter, headerParameter, pathVariable, pathVariableValue)
+				if d.logger.IsDebugEnable() {
+					d.logger.Debug(local, "请求路径 %s 控制器 %s 处理方法 %s 第 %d 参数类型 %s 值 %s", url,
+						util.ClassUtil.GetJavaClassNameByType(reflect.ValueOf(controller.Target).Elem().Type()),
+						proxyMethod.Name, i,
+						util.ClassUtil.GetJavaClassNameByType(pt), pv)
+				}
 				var pvi int = 0
 				if pv != "" {
 					var err error
@@ -243,6 +304,12 @@ func (d *DispatchServlet) Dispatch(local *context.LocalStack, request *http.Requ
 				param[i] = reflect.ValueOf(pvi)
 			case reflect.Int64:
 				pv := getParameterValueFromRequest(request, i, queryParameter, headerParameter, pathVariable, pathVariableValue)
+				if d.logger.IsDebugEnable() {
+					d.logger.Debug(local, "请求路径 %s 控制器 %s 处理方法 %s 第 %d 参数类型 %s 值 %s", url,
+						util.ClassUtil.GetJavaClassNameByType(reflect.ValueOf(controller.Target).Elem().Type()),
+						proxyMethod.Name, i,
+						util.ClassUtil.GetJavaClassNameByType(pt), pv)
+				}
 				var pvi int64 = 0
 				if pv != "" {
 					var err error
@@ -253,6 +320,10 @@ func (d *DispatchServlet) Dispatch(local *context.LocalStack, request *http.Requ
 				}
 				param[i] = reflect.ValueOf(pvi)
 			case reflect.Struct:
+				d.logger.Error(local, nil, "请求路径 %s 控制器 %s 处理方法 %s 第 %d 参数类型 %s 参数类型只支持ptr不支持struct", url,
+					util.ClassUtil.GetJavaClassNameByType(reflect.ValueOf(controller.Target).Elem().Type()),
+					proxyMethod.Name, i,
+					util.ClassUtil.GetJavaClassNameByType(pt))
 				panic(fmt.Errorf("struct only ptr"))
 			}
 		}
@@ -305,8 +376,39 @@ func GetDispatchServlet() *DispatchServlet {
 	return &dispatchServlet
 }
 
+type FrameHttpFactory struct {
+	logger    logclass.AppLoger
+	serConfig *ServerConfig
+	lock      sync.Mutex
+}
+
+func (a *FrameHttpFactory) initFrameHttpFactory(local *context.LocalStack,
+	applicationContext *application.FrameApplicationContext) {
+	if a.logger != nil {
+		return
+	}
+	a.lock.Lock()
+	defer func() {
+		a.lock.Unlock()
+	}()
+	if a.logger != nil {
+		return
+	}
+	config := &ServerConfig{}
+	applicationContext.Environment.GetObjectValue("server", config)
+	a.serConfig = config
+	a.logger = applicationContext.LogFactory.GetLoggerType(reflect.TypeOf(a).Elem())
+
+	a.logger.Debug(local, "[初始化] http配置 %s", util.JsonUtil.To2String(a.serConfig))
+	DefaultServConfig = a.serConfig
+}
+
 // AddControllerProxyTarget 思路是根据path前缀匹配到controller，在根据path和method去匹配controller具体的method
-func AddControllerProxyTarget(target1 proxyclass.ProxyTarger) {
+func (a *FrameHttpFactory) AddControllerProxyTarget(local1 *context.LocalStack, target1 proxyclass.ProxyTarger,
+	applicationContext *application.FrameApplicationContext) {
+	a.initFrameHttpFactory(local1, applicationContext)
+	GetDispatchServlet().initDispatchServlet(local1, applicationContext)
+
 	core.AddClassProxy(target1)
 
 	var absoluteMethodPath = make(map[string]*proxyclass.ProxyMethod)
@@ -333,9 +435,14 @@ func AddControllerProxyTarget(target1 proxyclass.ProxyTarger) {
 		if strings.Index(hp, "{") >= 0 || strings.Index(hp, "*") >= 0 {
 			noAbsoluteMethodPath = append(noAbsoluteMethodPath, method)
 			controllerRoot.SetPath(hp, method)
-			// controllerRoot.PrintTree()
+			a.logger.Debug(local1, "控制器 %s 正则路径设置 %s 对应实现方法 %s",
+				util.ClassUtil.GetJavaClassNameByType(reflect.ValueOf(target1).Elem().Type()),
+				mkey, method.Name) // controllerRoot.PrintTree()
 		} else {
 			absoluteMethodPath[mkey] = method
+			a.logger.Debug(local1, "控制器 %s 绝对路径设置 %s 对应实现方法 %s",
+				util.ClassUtil.GetJavaClassNameByType(reflect.ValueOf(target1).Elem().Type()),
+				mkey, method.Name)
 		}
 	}
 	var prefix = GetControllerPathPrefix(&dispatchServlet, target1)
@@ -365,13 +472,21 @@ func AddControllerProxyTarget(target1 proxyclass.ProxyTarger) {
 		Path:         strings.TrimSpace(prefix + "/"),
 		Handler:      f,
 		AbsolutePath: false,
+		Invoker:      invoker,
 	}
 	var f2 = &RouteMapping{
 		Path:         strings.TrimSpace(prefix),
 		Handler:      f,
 		AbsolutePath: true,
+		Invoker:      invoker,
 	}
 	dispatchServlet.routeMapping = append(dispatchServlet.routeMapping, f1, f2)
+}
+
+var frameHttpFactory FrameHttpFactory = FrameHttpFactory{}
+
+func GetFrameHttpFactory() *FrameHttpFactory {
+	return &frameHttpFactory
 }
 
 // getParameterValueFromRequest 获取方法常规变量

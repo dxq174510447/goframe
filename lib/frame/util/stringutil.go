@@ -12,6 +12,15 @@ const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 type stringUtil struct {
 }
 
+func (u *stringUtil) IsFirstCharUpperCase(content string) bool {
+	firstChar := content[0]
+	if firstChar < 65 || firstChar > 90 {
+		return false
+	} else {
+		return true
+	}
+}
+
 func (u *stringUtil) RemoveEmptyRow(content string) string {
 	return removeEmptyRowReg.ReplaceAllString(content, "")
 }

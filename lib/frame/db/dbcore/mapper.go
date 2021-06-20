@@ -8,12 +8,14 @@ import (
 	"github.com/dxq174510447/goframe/lib/frame/application"
 	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/exception"
+	"github.com/dxq174510447/goframe/lib/frame/log/logclass"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/core"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"github.com/dxq174510447/goframe/lib/frame/util"
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 )
@@ -143,7 +145,7 @@ type sqlColumnType struct {
 }
 
 type sqlInvoke struct {
-	Logger         application.AppLoger
+	Logger         logclass.AppLoger
 	target         interface{}
 	clazz          *proxyclass.ProxyClass
 	method         *proxyclass.ProxyMethod
@@ -169,16 +171,20 @@ type sqlInvoke struct {
 
 func (s *sqlInvoke) invoke(context *context.LocalStack, args []reflect.Value) []reflect.Value {
 	methodName := s.method.Name
-	ele := s.mapper[methodName]
-	switch ele.SqlType {
-	case SqlTypeSelect:
-		return s.invokeSelect(context, args, ele)
-	case SqlTypeUpdate:
-		return s.invokeUpdate(context, args, ele)
-	case SqlTypeInsert:
-		return s.invokeInsert(context, args, ele)
-	case SqlTypeDelete:
-		return s.invokeDelete(context, args, ele)
+	if ele, ok := s.mapper[methodName]; ok {
+		s.Logger.Debug(context, "%s 对应sql处理节点 %s", methodName, ele.Id)
+		switch ele.SqlType {
+		case SqlTypeSelect:
+			return s.invokeSelect(context, args, ele)
+		case SqlTypeUpdate:
+			return s.invokeUpdate(context, args, ele)
+		case SqlTypeInsert:
+			return s.invokeInsert(context, args, ele)
+		case SqlTypeDelete:
+			return s.invokeDelete(context, args, ele)
+		}
+	} else {
+		s.Logger.Error(context, nil, "%s 找不到对应sql处理节点", methodName)
 	}
 	return nil
 }
@@ -940,7 +946,7 @@ func newSqlInvoke(
 			returnSqlElementType = returnSqlType
 		}
 	}
-	var logger application.AppLoger
+	var logger logclass.AppLoger
 	if applicationContext != nil && applicationContext.LogFactory != nil {
 		logger = applicationContext.LogFactory.GetLoggerType(reflect.TypeOf(target).Elem())
 	}
@@ -976,9 +982,29 @@ func GetDaoConfig(target1 proxyclass.ProxyTarger) *DaoConfig {
 	return nil
 }
 
-func AddMapperProxyTarget(local *context.LocalStack, target1 proxyclass.ProxyTarger,
-	applicationContext *application.FrameApplicationContext) {
+type FrameOrmFactory struct {
+	logger logclass.AppLoger
+	lock   sync.Mutex
+}
 
+func (f *FrameOrmFactory) intiFrameOrmFactory(local *context.LocalStack, applicationContext *application.FrameApplicationContext) {
+	if f.logger != nil {
+		return
+	}
+	f.lock.Lock()
+	defer func() {
+		f.lock.Unlock()
+	}()
+	if f.logger != nil {
+		return
+	}
+	f.logger = applicationContext.LogFactory.GetLoggerType(reflect.TypeOf(f).Elem())
+	f.logger.Debug(local, "[初始化] FrameOrmFactory")
+}
+
+func (f *FrameOrmFactory) AddMapperProxyTarget(local *context.LocalStack, target1 proxyclass.ProxyTarger,
+	applicationContext *application.FrameApplicationContext) {
+	f.intiFrameOrmFactory(local, applicationContext)
 	//解析字段方法 包裹一层
 	rv := reflect.ValueOf(target1)
 	rt := rv.Elem().Type()
@@ -1015,24 +1041,27 @@ func AddMapperProxyTarget(local *context.LocalStack, target1 proxyclass.ProxyTar
 					for j := 0; j < m2; j++ {
 						basefield := field.Type.Field(j)
 						target := rv.Elem().FieldByName(field.Name)
-						addCallerToField(target1, &target, &basefield, methodRef,
+						f.logger.Debug(local, "[初始化] dao的方法初始化 实例 %s 方法 %s",
+							util.ClassUtil.GetJavaClassNameByType(rt), basefield.Name)
+						f.addCallerToField(target1, &target, &basefield, methodRef,
 							baseXmlEle, dapEntity, true,
 							baseXmlEle, tableDef, local, applicationContext)
 					}
 				}
 			} else if field.Type.Kind() == reflect.Func && rv.Elem().FieldByName(field.Name).IsNil() {
 				target := rv.Elem()
-				addCallerToField(target1, &target, &field, methodRef,
+				f.logger.Debug(local, "[初始化] dao的方法初始化 实例 %s 方法 %s",
+					util.ClassUtil.GetJavaClassNameByType(rt), field.Name)
+				f.addCallerToField(target1, &target, &field, methodRef,
 					xmlele, dapEntity, false,
 					baseXmlEle, tableDef, local, applicationContext)
 			}
 		}
 	}
-
 	core.AddClassProxy(target1)
 }
 
-func addCallerToField(target1 proxyclass.ProxyTarger,
+func (f *FrameOrmFactory) addCallerToField(target1 proxyclass.ProxyTarger,
 	target *reflect.Value,
 	field *reflect.StructField,
 	methodRef map[string]*proxyclass.ProxyMethod,
@@ -1087,6 +1116,12 @@ func addCallerToField(target1 proxyclass.ProxyTarger,
 		return newCall
 	}(invoker)
 	call.Set(proxyCall)
+}
+
+var frameOrmFactory FrameOrmFactory = FrameOrmFactory{}
+
+func GetFrameOrmFactory() *FrameOrmFactory {
+	return &frameOrmFactory
 }
 
 func NewSqlProvierConfigAnnotation(param string) *proxyclass.AnnotationClass {

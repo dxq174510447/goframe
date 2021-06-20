@@ -22,11 +22,17 @@ func (c *classUtil) GetClassNameByType(t reflect.Type) string {
 }
 
 func (c *classUtil) GetJavaClassNameByType(t reflect.Type) string {
-	name := fmt.Sprintf("%s/%s", t.PkgPath(), t.Name())
+	m := t
+	if t.Kind() == reflect.Ptr {
+		m = t.Elem()
+	}
+	name := fmt.Sprintf("%s/%s", m.PkgPath(), m.Name())
+
 	name = strings.ReplaceAll(name, "/", ".")
 	p := strings.Index(name, ".main.golang.")
 	if p == -1 {
-		p = strings.Index(name, ".goframe.lib")
+		// 引用到时候
+		p = strings.Index(name, ".goframe.lib.")
 		if p == -1 {
 			p1 := strings.Index(name, ".")
 			if p1 == -1 {

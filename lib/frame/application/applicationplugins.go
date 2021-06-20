@@ -12,38 +12,8 @@ import (
 	"text/template"
 )
 
-type AppLogFactoryer interface {
-	Parse(content string, funcMap template.FuncMap)
-
-	GetLoggerType(p reflect.Type) AppLoger
-
-	GetLoggerString(className string) AppLoger
-}
-
 type HttpStarter interface {
 	HttpStart(local *context.LocalStack, applicationContext *FrameApplicationContext)
-}
-
-type AppLoger interface {
-	Trace(local *context.LocalStack, format string, a ...interface{})
-
-	IsTraceEnable() bool
-
-	Debug(local *context.LocalStack, format string, a ...interface{})
-
-	IsDebugEnable() bool
-
-	Info(local *context.LocalStack, format string, a ...interface{})
-
-	IsInfoEnable() bool
-
-	Warn(local *context.LocalStack, format string, a ...interface{})
-
-	IsWarnEnable() bool
-
-	Error(local *context.LocalStack, err interface{}, format string, a ...interface{})
-
-	IsErrorEnable() bool
 }
 
 type ProxyInstanceAdapter interface {
