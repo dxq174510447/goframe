@@ -15,6 +15,24 @@ type ServerServletConfig struct {
 	ContextPath string
 }
 
+type TestHttpStart struct {
+	Logger logclass.AppLoger `FrameAutowired:""`
+}
+
+func (t *TestHttpStart) HttpStart(local *context.LocalStack, applicationContext *application.FrameApplicationContext) {
+	t.Logger.Debug(local, "测试类启动 不启动http请求  模拟http请求启动")
+}
+
+func (t *TestHttpStart) ProxyTarget() *proxyclass.ProxyClass {
+	return nil
+}
+
+var testHttpStart TestHttpStart = TestHttpStart{}
+
+func GetTestHttpStart() *TestHttpStart {
+	return &testHttpStart
+}
+
 type HttpServListener struct {
 	Logger     logclass.AppLoger           `FrameAutowired:""`
 	Dispatcher *event.FrameEventDispatcher `FrameAutowired:""`
@@ -77,4 +95,5 @@ var httpServListener HttpServListener = HttpServListener{}
 
 func init() {
 	application.AddProxyInstance("", proxyclass.ProxyTarger(&httpServListener))
+	application.AddProxyInstance("", proxyclass.ProxyTarger(&testHttpStart))
 }
