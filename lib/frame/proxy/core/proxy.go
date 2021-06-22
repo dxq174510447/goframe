@@ -409,6 +409,11 @@ var matchAllCap = regexp.MustCompile(`[^A-Za-z0-9]+`)
 
 func GetCamelCaseName(str string) string {
 	st := matchAllCap.Split(str, -1)
+
+	//aaaBb-->AaaBb
+	if len(st) == 1 {
+		return strings.Title(str)
+	}
 	for k, s := range st {
 		st[k] = strings.Title(strings.ToLower(s))
 	}

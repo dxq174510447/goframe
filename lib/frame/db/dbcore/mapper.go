@@ -863,6 +863,7 @@ func (s *sqlInvoke) coverToGoType(ct *sql.ColumnType) *sqlColumnType {
 
 	if len(s.structFieldMap) > 0 {
 		columnName := ct.Name()
+		// AddId-->Addid有问题
 		fieldName := core.GetCamelCaseName(columnName)
 		if field, ok := s.structFieldMap[fieldName]; ok {
 			addDefaultType = false
