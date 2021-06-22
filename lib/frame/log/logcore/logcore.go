@@ -47,7 +47,7 @@ type LogMessage struct {
 	Msg      string
 	Err      interface{}
 	Thread   string
-	Date     time.Time
+	Date     *time.Time
 }
 type PatternLayout struct {
 	Pattern         string
@@ -58,12 +58,13 @@ type PatternLayout struct {
 
 // err可nil
 func (p *PatternLayout) DoLayout(local *context.LocalStack, config *logclass.LoggerConfig, row string, err interface{}) {
+	t1 := time.Now()
 	msg := &LogMessage{
 		Name:  config.Name,
 		Level: config.Level,
 		Msg:   row,
 		Err:   err,
-		Date:  time.Now(),
+		Date:  &t1,
 	}
 	if p.HasRuntimeParam {
 		_, file, line, ok := runtime.Caller(3)

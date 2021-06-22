@@ -692,7 +692,7 @@ func (s *sqlInvoke) getArgumentsFromSql(local *context.LocalStack, args []reflec
 	}
 	var result []interface{}
 	for _, v := range variables {
-		m := core.GetVariableValue(root, v)
+		m := core.GetVariableValue(root, v, 1)
 		result = append(result, m)
 	}
 	return result, nsql, nil
@@ -870,9 +870,22 @@ func (s *sqlInvoke) coverToGoType(ct *sql.ColumnType) *sqlColumnType {
 			result.defaultType = field.Type
 		}
 	}
-	//fmt.Println(s.structFieldMap)
-	//fmt.Println(result.defaultType)
-	//fmt.Println(result.column.Name(), result.field.Type)
+
+	// 单列返回
+	if addDefaultType {
+		switch s.returnSqlElementType.Kind() {
+		case reflect.Int64:
+			result.defaultType = reflect.TypeOf(int64(1))
+			addDefaultType = false
+		case reflect.Int:
+			result.defaultType = reflect.TypeOf(int(1))
+			addDefaultType = false
+		case reflect.Float64:
+			result.defaultType = reflect.TypeOf(float64(1))
+			addDefaultType = false
+		}
+	}
+
 	if addDefaultType {
 		databasetype := strings.ToLower(ct.DatabaseTypeName())
 		if strings.Index(databasetype, "int") >= 0 {

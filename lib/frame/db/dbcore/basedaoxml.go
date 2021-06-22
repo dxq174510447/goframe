@@ -10,16 +10,16 @@ const BaseXml = `
 <mapper>
 	<insert id="Save">
 			insert into {{.Name}}(
-			{{range $index, $ele := $.Columns}}{{if $index}},{{end}}{{printf "%c" 96}}{{$ele.ColumnName}}{{printf "%c" 96}}{{end}}
+			{{range $index, $ele := $.Columns}}{{if $ele.Insertable}}{{if $index}},{{end}}{{printf "%c" 96}}{{$ele.ColumnName}}{{printf "%c" 96}}{{end}}{{end}}
 			) values (
-			{{range $index, $ele := $.Columns}}{{if $index}},{{end}}#{{"{"}}{{$ele.FieldName}}{{"}"}}{{end}}
+			{{range $index, $ele := $.Columns}}{{if $ele.Insertable}}{{if $index}},{{end}}#{{"{"}}{{$ele.FieldName}}{{"}"}}{{end}}{{end}}
 			)
 	</insert>
 
 	<update id="Update">
 		update {{.Name}} 
 		set
-		{{range $index, $ele := $.Columns}}{{if $ele.Updatable}}{{if $index}},{{end}}{{printf "%c" 96}}{{$ele.ColumnName}}{{printf "%c" 96}} = #{{"{"}}{{$ele.FieldName}}{{"}"}}{{end}}{{end}}
+		{{range $index, $ele := $.UpdateColumns}}{{if $ele.Updatable}}{{if $index}},{{end}}{{printf "%c" 96}}{{$ele.ColumnName}}{{printf "%c" 96}} = #{{"{"}}{{$ele.FieldName}}{{"}"}}{{end}}{{end}}
 		where {{printf "%c" 96}}{{.IdColumn.ColumnName}}{{printf "%c" 96}} = #{{"{"}}{{.IdColumn.FieldName}}{{"}"}}
 	</update>
 

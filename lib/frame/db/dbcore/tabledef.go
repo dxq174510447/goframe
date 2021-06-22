@@ -13,6 +13,7 @@ type TableDef struct {
 	GenerationType string
 	IdColumn       *TableColumnDef
 	Columns        []*TableColumnDef
+	UpdateColumns  []*TableColumnDef
 }
 
 type TableColumnDef struct {
@@ -21,6 +22,8 @@ type TableColumnDef struct {
 	ColumnName string
 	Transient  bool
 	Updatable  bool
+	Insertable bool
+	DateType   string "date,datetime"
 }
 
 func fieldNameToColumanName(fieldName string) string {
@@ -103,6 +106,19 @@ func parseEntityType(entity interface{}) *TableDef {
 				tc.Updatable = false
 			}
 		}
+
+		tc.Insertable = true
+		if insertable, ok := field.Tag.Lookup("insertable"); ok {
+			if insertable == "false" {
+				tc.Insertable = false
+			}
+		}
+
+		tc.DateType = "datetime"
+		if datetype, ok := field.Tag.Lookup("datetype"); ok {
+			tc.DateType = datetype
+		}
+
 		if generationType, ok := field.Tag.Lookup("GenerationType"); ok {
 			if generationType != "" {
 				td.GenerationType = generationType
@@ -121,6 +137,10 @@ func parseEntityType(entity interface{}) *TableDef {
 
 		if !tc.Transient {
 			td.Columns = append(td.Columns, tc)
+
+			if tc.Updatable {
+				td.UpdateColumns = append(td.UpdateColumns, tc)
+			}
 		}
 	}
 

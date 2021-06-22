@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 type methodInvoke struct {
@@ -256,7 +257,8 @@ func proxyStructFuncField(target proxyclass.ProxyTarger,
 	call.Set(proxyCall)
 }
 
-func getTargetValue(target interface{}, name string) interface{} {
+// sourceType 1 dbmapper
+func getTargetValue(target interface{}, name string, sourceType int) interface{} {
 	v := reflect.ValueOf(target)
 	switch v.Kind() {
 	case reflect.String, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Float32, reflect.Float64:
@@ -283,6 +285,27 @@ func getTargetValue(target interface{}, name string) interface{} {
 				index1, _ := strconv.Atoi(index)
 				return v.Elem().FieldByName(field).Index(index1).Interface()
 			} else {
+
+				// 这里db查询的时候 如果是日期特殊处理
+				if sourceType == 1 {
+					field, _ := v.Elem().Type().FieldByName(name)
+					fielType := v.Elem().FieldByName(name).Type()
+					if fielType.Kind() == reflect.Ptr && fielType.Elem() == proxyclass.GoTimeType {
+						if datetype, ok := field.Tag.Lookup("datetype"); ok {
+							r := v.Elem().FieldByName(name).Interface()
+							if r == nil {
+								return r
+							}
+							d1 := r.(*time.Time)
+							if datetype == "date" {
+								return util.DateUtil.FormatByType(d1, util.DatePattern4)
+							} else {
+								return util.DateUtil.FormatByType(d1, util.DatePattern1)
+							}
+						}
+					}
+				}
+
 				return v.Elem().FieldByName(name).Interface()
 			}
 		}
@@ -291,17 +314,18 @@ func getTargetValue(target interface{}, name string) interface{} {
 }
 
 // GetVariableValue target 可能map接口 基础类型 指针结构体类型
-func GetVariableValue(target interface{}, name string) interface{} {
+// sourceType 1 dbmapper
+func GetVariableValue(target interface{}, name string, sourceType int) interface{} {
 
 	keys := strings.Split(name, ".")
 
 	l := len(keys)
 	if l == 1 {
-		return getTargetValue(target, name)
+		return getTargetValue(target, name, sourceType)
 	} else {
 		nt := target
 		for i := 0; i < l; i++ {
-			nt = getTargetValue(nt, keys[i])
+			nt = getTargetValue(nt, keys[i], sourceType)
 			//中间值为nil 就panic
 			if i < (l-1) && reflect.ValueOf(nt).IsZero() {
 				panic(fmt.Sprintf("sql %s is nil value", name))
