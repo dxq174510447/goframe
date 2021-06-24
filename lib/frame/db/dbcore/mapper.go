@@ -76,11 +76,11 @@ func (m *MapperFactory) ReplaceImportTag(sql string, refs map[string]*MapperElem
 			var buffer []string
 			if len(str1) == 0 || str1[0] == "" {
 				for _, col := range table.Columns {
-					buffer = append(buffer, fmt.Sprintf("%c%s%c", 96, col.FieldName, 96))
+					buffer = append(buffer, fmt.Sprintf("%c%s%c", 96, col.ColumnName, 96))
 				}
 			} else {
 				for _, col := range table.Columns {
-					buffer = append(buffer, fmt.Sprintf("%s.%c%s%c", str1[0], 96, col.FieldName, 96))
+					buffer = append(buffer, fmt.Sprintf("%s.%c%s%c", str1[1], 96, col.ColumnName, 96))
 				}
 			}
 			return strings.Join(buffer, ",")
