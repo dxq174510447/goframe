@@ -1044,14 +1044,14 @@ func (f *FrameOrmFactory) AddMapperProxyTarget(local *context.LocalStack, target
 	rt := rv.Elem().Type()
 
 	var tableDef *TableDef
-	daoConfig := GetDaoConfig(target1)
+	daoConfig1 := GetDaoConfig(target1)
 
-	daoEntity := daoConfig.Entity
+	daoEntity := daoConfig1.Entity
 	if daoEntity != nil {
 		tableDef = parseEntityType(daoEntity)
 	}
 
-	xmlele := mapperFactory.ParseXml(target1, daoConfig.Xml, tableDef)
+	xmlele := mapperFactory.ParseXml(target1, daoConfig1.Xml, tableDef)
 	var baseXmlEle map[string]*MapperElementXml
 
 	if BaseXml != "" {
@@ -1081,7 +1081,7 @@ func (f *FrameOrmFactory) AddMapperProxyTarget(local *context.LocalStack, target
 						f.logger.Debug(local, "[初始化] dao的方法初始化 实例 %s 方法 %s",
 							util.ClassUtil.GetJavaClassNameByType(rt), basefield.Name)
 						f.addCallerToField(target1, &target, &basefield, methodRef,
-							baseXmlEle, daoConfig, true,
+							baseXmlEle, daoEntity, true,
 							baseXmlEle, tableDef, local, applicationContext)
 					}
 				}
@@ -1090,7 +1090,7 @@ func (f *FrameOrmFactory) AddMapperProxyTarget(local *context.LocalStack, target
 				f.logger.Debug(local, "[初始化] dao的方法初始化 实例 %s 方法 %s",
 					util.ClassUtil.GetJavaClassNameByType(rt), field.Name)
 				f.addCallerToField(target1, &target, &field, methodRef,
-					xmlele, daoConfig, false,
+					xmlele, daoEntity, false,
 					baseXmlEle, tableDef, local, applicationContext)
 			}
 		}
