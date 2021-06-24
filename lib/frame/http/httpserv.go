@@ -29,6 +29,24 @@ func (t *TestHttpStart) ProxyTarget() *proxyclass.ProxyClass {
 
 var testHttpStart TestHttpStart = TestHttpStart{}
 
+type NonHttpStart struct {
+	Logger logclass.AppLoger `FrameAutowired:""`
+}
+
+func (t *NonHttpStart) HttpStart(local *context.LocalStack, applicationContext *application.FrameApplicationContext) {
+	//t.Logger.Debug(local, "测试类启动 不启动http请求  模拟http请求启动")
+}
+
+func (t *NonHttpStart) ProxyTarget() *proxyclass.ProxyClass {
+	return nil
+}
+
+var nonHttpStart NonHttpStart = NonHttpStart{}
+
+func GetNonHttpStart() *NonHttpStart {
+	return &nonHttpStart
+}
+
 func GetTestHttpStart() *TestHttpStart {
 	return &testHttpStart
 }
@@ -96,4 +114,5 @@ var httpServListener HttpServListener = HttpServListener{}
 func init() {
 	application.AddProxyInstance("", proxyclass.ProxyTarger(&httpServListener))
 	application.AddProxyInstance("", proxyclass.ProxyTarger(&testHttpStart))
+	application.AddProxyInstance("", proxyclass.ProxyTarger(&nonHttpStart))
 }

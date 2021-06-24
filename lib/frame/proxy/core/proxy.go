@@ -292,10 +292,14 @@ func getTargetValue(target interface{}, name string, sourceType int) interface{}
 					fielType := v.Elem().FieldByName(name).Type()
 					if fielType.Kind() == reflect.Ptr && fielType.Elem() == proxyclass.GoTimeType {
 						if datetype, ok := field.Tag.Lookup("datetype"); ok {
-							r := v.Elem().FieldByName(name).Interface()
-							if r == nil {
-								return r
+							//r := v.Elem().FieldByName(name).Interface()
+							//if r == nil {
+							//	return r
+							//}
+							if v.Elem().FieldByName(name).IsZero() {
+								return nil
 							}
+							r := v.Elem().FieldByName(name).Interface()
 							d1 := r.(*time.Time)
 							if datetype == "date" {
 								return util.DateUtil.FormatByType(d1, util.DatePattern4)
