@@ -58,9 +58,10 @@ type MapperXml struct {
 
 type MapperFactory struct {
 	importTagRegexp *regexp.Regexp
+	columnTagRegexp *regexp.Regexp
 }
 
-func (m *MapperFactory) ReplaceImportTag(sql string, refs map[string]*MapperElementXml) string {
+func (m *MapperFactory) ReplaceImportTag(sql string, refs map[string]*MapperElementXml, table *TableDef) string {
 	ns := m.importTagRegexp.ReplaceAllStringFunc(sql, func(str string) string {
 		str1 := m.importTagRegexp.FindStringSubmatch(str)
 		if s, ok := refs[str1[1]]; ok {
@@ -68,6 +69,24 @@ func (m *MapperFactory) ReplaceImportTag(sql string, refs map[string]*MapperElem
 		}
 		return ""
 	})
+
+	if table != nil {
+		ns = m.columnTagRegexp.ReplaceAllStringFunc(ns, func(str string) string {
+			str1 := m.columnTagRegexp.FindStringSubmatch(str)
+			var buffer []string
+			if len(str1) == 0 || str1[0] == "" {
+				for _, col := range table.Columns {
+					buffer = append(buffer, fmt.Sprintf("%c%s%c", 96, col.FieldName, 96))
+				}
+			} else {
+				for _, col := range table.Columns {
+					buffer = append(buffer, fmt.Sprintf("%s.%c%s%c", str1[0], 96, col.FieldName, 96))
+				}
+			}
+			return strings.Join(buffer, ",")
+		})
+	}
+
 	reg := regexp.MustCompile(`(?m)(^\s+|\s+$)`)
 	ns = reg.ReplaceAllString(ns, " ")
 	ns = strings.ReplaceAll(ns, "<![CDATA[", "")
@@ -75,7 +94,7 @@ func (m *MapperFactory) ReplaceImportTag(sql string, refs map[string]*MapperElem
 	return ns
 }
 
-func (m *MapperFactory) ParseXml(target proxyclass.ProxyTarger, content string) map[string]*MapperElementXml {
+func (m *MapperFactory) ParseXml(target proxyclass.ProxyTarger, content string, table *TableDef) map[string]*MapperElementXml {
 	mapper := &MapperXml{}
 	err := xml.Unmarshal([]byte(content), mapper)
 
@@ -94,7 +113,7 @@ func (m *MapperFactory) ParseXml(target proxyclass.ProxyTarger, content string) 
 	if len(mapper.UpdateSql) > 0 {
 		for _, ele := range mapper.UpdateSql {
 			ele.SqlType = SqlTypeUpdate
-			ele.Sql = m.ReplaceImportTag(ele.Sql, refs)
+			ele.Sql = m.ReplaceImportTag(ele.Sql, refs, table)
 			ele.Tpl = template.Must(template.New(fmt.Sprintf("%s-%s", util.ClassUtil.GetClassName(target), ele.Id)).Parse(ele.Sql))
 			refs[ele.Id] = ele
 		}
@@ -103,7 +122,7 @@ func (m *MapperFactory) ParseXml(target proxyclass.ProxyTarger, content string) 
 	if len(mapper.InsertSql) > 0 {
 		for _, ele := range mapper.InsertSql {
 			ele.SqlType = SqlTypeInsert
-			ele.Sql = m.ReplaceImportTag(ele.Sql, refs)
+			ele.Sql = m.ReplaceImportTag(ele.Sql, refs, table)
 			ele.Tpl = template.Must(template.New(fmt.Sprintf("%s-%s", util.ClassUtil.GetClassName(target), ele.Id)).Parse(ele.Sql))
 			refs[ele.Id] = ele
 		}
@@ -112,7 +131,7 @@ func (m *MapperFactory) ParseXml(target proxyclass.ProxyTarger, content string) 
 	if len(mapper.SelectSql) > 0 {
 		for _, ele := range mapper.SelectSql {
 			ele.SqlType = SqlTypeSelect
-			ele.Sql = m.ReplaceImportTag(ele.Sql, refs)
+			ele.Sql = m.ReplaceImportTag(ele.Sql, refs, table)
 			ele.Tpl = template.Must(template.New(fmt.Sprintf("%s-%s", util.ClassUtil.GetClassName(target), ele.Id)).Parse(ele.Sql))
 			refs[ele.Id] = ele
 		}
@@ -121,7 +140,7 @@ func (m *MapperFactory) ParseXml(target proxyclass.ProxyTarger, content string) 
 	if len(mapper.DeleteSql) > 0 {
 		for _, ele := range mapper.DeleteSql {
 			ele.SqlType = SqlTypeDelete
-			ele.Sql = m.ReplaceImportTag(ele.Sql, refs)
+			ele.Sql = m.ReplaceImportTag(ele.Sql, refs, table)
 			ele.Tpl = template.Must(template.New(fmt.Sprintf("%s-%s", util.ClassUtil.GetClassName(target), ele.Id)).Parse(ele.Sql))
 			refs[ele.Id] = ele
 		}
@@ -132,6 +151,7 @@ func (m *MapperFactory) ParseXml(target proxyclass.ProxyTarger, content string) 
 
 var mapperFactory MapperFactory = MapperFactory{
 	importTagRegexp: regexp.MustCompile(`<include refid="(\S+)">\s*</include>`),
+	columnTagRegexp: regexp.MustCompile(`<column alias="(\S+)">\s*</column>`),
 }
 
 func GetMapperFactory() *MapperFactory {
@@ -1023,21 +1043,24 @@ func (f *FrameOrmFactory) AddMapperProxyTarget(local *context.LocalStack, target
 	rv := reflect.ValueOf(target1)
 	rt := rv.Elem().Type()
 
+	var tableDef *TableDef
 	daoConfig := GetDaoConfig(target1)
 
-	xmlele := mapperFactory.ParseXml(target1, daoConfig.Xml)
+	daoEntity := daoConfig.Entity
+	if daoEntity != nil {
+		tableDef = parseEntityType(daoEntity)
+	}
+
+	xmlele := mapperFactory.ParseXml(target1, daoConfig.Xml, tableDef)
 	var baseXmlEle map[string]*MapperElementXml
 
-	var tableDef *TableDef
-	dapEntity := daoConfig.Entity
 	if BaseXml != "" {
-		tableDef = parseEntityType(dapEntity)
 		buf := &bytes.Buffer{}
 		err1 := BaseXmlTpl.Execute(buf, tableDef)
 		if err1 != nil {
 			panic(err1)
 		}
-		baseXmlEle = mapperFactory.ParseXml(target1, buf.String())
+		baseXmlEle = mapperFactory.ParseXml(target1, buf.String(), tableDef)
 	}
 
 	methodRef := make(map[string]*proxyclass.ProxyMethod)
@@ -1058,7 +1081,7 @@ func (f *FrameOrmFactory) AddMapperProxyTarget(local *context.LocalStack, target
 						f.logger.Debug(local, "[初始化] dao的方法初始化 实例 %s 方法 %s",
 							util.ClassUtil.GetJavaClassNameByType(rt), basefield.Name)
 						f.addCallerToField(target1, &target, &basefield, methodRef,
-							baseXmlEle, dapEntity, true,
+							baseXmlEle, daoConfig, true,
 							baseXmlEle, tableDef, local, applicationContext)
 					}
 				}
@@ -1067,7 +1090,7 @@ func (f *FrameOrmFactory) AddMapperProxyTarget(local *context.LocalStack, target
 				f.logger.Debug(local, "[初始化] dao的方法初始化 实例 %s 方法 %s",
 					util.ClassUtil.GetJavaClassNameByType(rt), field.Name)
 				f.addCallerToField(target1, &target, &field, methodRef,
-					xmlele, dapEntity, false,
+					xmlele, daoConfig, false,
 					baseXmlEle, tableDef, local, applicationContext)
 			}
 		}
