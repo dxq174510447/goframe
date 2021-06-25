@@ -74,7 +74,7 @@ func (m *MapperFactory) ReplaceImportTag(sql string, refs map[string]*MapperElem
 		ns = m.columnTagRegexp.ReplaceAllStringFunc(ns, func(str string) string {
 			str1 := m.columnTagRegexp.FindStringSubmatch(str)
 			var buffer []string
-			if len(str1) == 0 || str1[0] == "" {
+			if len(str1) == 0 || str1[1] == "" {
 				for _, col := range table.Columns {
 					buffer = append(buffer, fmt.Sprintf("%c%s%c", 96, col.ColumnName, 96))
 				}
@@ -151,7 +151,7 @@ func (m *MapperFactory) ParseXml(target proxyclass.ProxyTarger, content string, 
 
 var mapperFactory MapperFactory = MapperFactory{
 	importTagRegexp: regexp.MustCompile(`<include refid="(\S+)">\s*</include>`),
-	columnTagRegexp: regexp.MustCompile(`<column alias="(\S+)">\s*</column>`),
+	columnTagRegexp: regexp.MustCompile(`<column alias="(\S*)">\s*</column>`),
 }
 
 func GetMapperFactory() *MapperFactory {
