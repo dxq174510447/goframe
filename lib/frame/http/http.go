@@ -457,7 +457,7 @@ func (a *FrameHttpFactory) AddControllerProxyTarget(local1 *context.LocalStack, 
 	f := func(invoker1 *ControllerVar) func(http.ResponseWriter, *http.Request) {
 		return func(response http.ResponseWriter, request *http.Request) {
 			local := context.NewLocalStack()
-			local.SetThread()
+			local.SetThread("")
 			SetCurrentControllerInvoker(local, invoker1)
 
 			SetCurrentHttpRequest(local, request)

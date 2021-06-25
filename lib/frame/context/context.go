@@ -58,9 +58,12 @@ func (f *LocalStack) Get(key string) interface{} {
 	return nil
 }
 
-func (f *LocalStack) SetThread() string {
-	threadName := util.DateUtil.FormatNowByType(util.DatePattern3)
-	threadName = fmt.Sprintf("%s-%s", threadName, util.StringUtil.GetRandomStr(5))
+func (f *LocalStack) SetThread(threadId string) string {
+	threadName := threadId
+	if threadName == "" {
+		threadName = util.DateUtil.FormatNowByType(util.DatePattern3)
+		threadName = fmt.Sprintf("%s-%s", threadName, util.StringUtil.GetRandomStr(5))
+	}
 	top := f.Peek()
 	top[ThreadLocalIdKey] = threadName
 	return threadName

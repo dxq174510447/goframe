@@ -116,7 +116,7 @@ func (a *FrameApplication) HttpServ(starter HttpStarter) *FrameApplication {
 func (a *FrameApplication) Run(args []string) *FrameApplicationContext {
 
 	local := context.NewLocalStack()
-	local.SetThread()
+	local.SetThread("")
 	var listeners *ApplicationRunContextListeners
 	var context1 *FrameApplicationContext
 	defer func() {

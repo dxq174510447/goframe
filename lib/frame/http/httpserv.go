@@ -69,7 +69,7 @@ func (h *HttpServListener) Running(local *context.LocalStack, application *appli
 
 	go func() {
 		l := context.NewLocalStack()
-		l.SetThread()
+		l.SetThread("")
 
 		select {
 		case <-time.After(4 * time.Second):
