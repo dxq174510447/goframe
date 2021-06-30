@@ -377,9 +377,9 @@ func GetDispatchServlet() *DispatchServlet {
 }
 
 type FrameHttpFactory struct {
-	logger    logclass.AppLoger
-	serConfig *ServerConfig
-	lock      sync.Mutex
+	logger logclass.AppLoger
+	//serConfig *ServerConfig
+	lock sync.Mutex
 }
 
 func (a *FrameHttpFactory) initFrameHttpFactory(local *context.LocalStack,
@@ -396,11 +396,11 @@ func (a *FrameHttpFactory) initFrameHttpFactory(local *context.LocalStack,
 	}
 	config := &ServerConfig{}
 	applicationContext.Environment.GetObjectValue("server", config)
-	a.serConfig = config
 	a.logger = applicationContext.LogFactory.GetLoggerType(reflect.TypeOf(a).Elem())
 
-	a.logger.Debug(local, "[初始化] http配置 %s", util.JsonUtil.To2String(a.serConfig))
-	DefaultServConfig = a.serConfig
+	if config.Servlet != nil {
+		DefaultServConfig = config
+	}
 }
 
 // AddControllerProxyTarget 思路是根据path前缀匹配到controller，在根据path和method去匹配controller具体的method
