@@ -1,6 +1,7 @@
 package logcore
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/xml"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"text/template"
@@ -67,12 +69,12 @@ func (p *PatternLayout) DoLayout(local *context.LocalStack, config *logclass.Log
 		Date:  &t1,
 	}
 	if p.HasRuntimeParam {
-		_, file, line, ok := runtime.Caller(3)
+		_, file2, line, ok := runtime.Caller(3)
 		if !ok {
 			msg.FileName = "???"
 			msg.Line = "0"
 		} else {
-			msg.FileName = util.ClassUtil.GetJavaFileNameByType(file)
+			msg.FileName = util.ClassUtil.GetJavaFileNameByType(file2)
 			msg.Line = strconv.Itoa(line)
 		}
 	}
@@ -85,10 +87,39 @@ func (p *PatternLayout) DoLayout(local *context.LocalStack, config *logclass.Log
 	}
 
 	// fmt.Println(util.JsonUtil.To2String(msg))
-	err1 := p.Tpl.Execute(p.Target, msg)
-	if err1 != nil {
-		panic(err1)
+	if err == nil {
+		err1 := p.Tpl.Execute(p.Target, msg)
+		if err1 != nil {
+			panic(err1)
+		}
+	} else {
+		rtErr := reflect.ValueOf(err)
+		if rtErr.IsZero() {
+			err1 := p.Tpl.Execute(p.Target, msg)
+			if err1 != nil {
+				panic(err1)
+			}
+		} else {
+			buf := &bytes.Buffer{}
+			err1 := p.Tpl.Execute(buf, msg)
+			if err1 != nil {
+				panic(err1)
+			}
+
+			if rtErr.Type().Implements(util.FrameErrorType) {
+				err2 := err.(error)
+				buf.Write([]byte(err2.Error()))
+			} else {
+				err2 := fmt.Sprintf("%s", err)
+				buf.Write([]byte(err2))
+			}
+			stack := strings.Join(strings.Split(string(debug.Stack()), "\n")[6:], "\n")
+			buf.Write([]byte(stack))
+			buf.Write([]byte("\n"))
+			p.Target.Write(buf.Bytes())
+		}
 	}
+
 }
 
 var layOutFuncMap = template.FuncMap{
@@ -278,6 +309,42 @@ func NewLayout(pattern string, writer io.Writer) *PatternLayout {
 	return l
 }
 
+type FileAppenderImpl struct {
+	Layout     *PatternLayout
+	Target     io.Writer
+	FilePath   string
+	FileTarget *os.File
+	FileBuffer *bufio.Writer
+}
+
+func (f *FileAppenderImpl) AppendRow(local *context.LocalStack, config *logclass.LoggerConfig, row string, err interface{}) {
+	f.Layout.DoLayout(local, config, row, err)
+	f.FileBuffer.Flush()
+}
+
+func (f *FileAppenderImpl) AppenderKey() string {
+	return FileAppenderAdapterKey
+}
+
+func (f *FileAppenderImpl) NewAppender(ele *logclass.LogAppenderXmlEle) logclass.LogAppender {
+
+	fileTarget, err := os.OpenFile(ele.File, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		panic(err)
+	}
+	bufferWriter := bufio.NewWriter(fileTarget)
+
+	layout := NewLayout(ele.Encoder[0].Pattern, bufferWriter)
+	result := &FileAppenderImpl{
+		Layout:     layout,
+		Target:     bufferWriter,
+		FileTarget: fileTarget,
+		FilePath:   ele.File,
+		FileBuffer: bufferWriter,
+	}
+	return logclass.LogAppender(result)
+}
+
 type ConsoleAppenderImpl struct {
 	Layout *PatternLayout
 	Target io.Writer
@@ -420,9 +487,11 @@ func (l *Logger) IsErrorEnable() bool {
 }
 
 var console ConsoleAppenderImpl = ConsoleAppenderImpl{}
+var file FileAppenderImpl = FileAppenderImpl{}
 
 var buildInAppender map[string]logclass.LogAppender = map[string]logclass.LogAppender{
 	ConsoleAppenderAdapterKey: logclass.LogAppender(&console),
+	FileAppenderAdapterKey:    logclass.LogAppender(&file),
 }
 
 type LogFactory struct {

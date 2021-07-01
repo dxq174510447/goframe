@@ -5,6 +5,8 @@ const (
 
 	ConsoleAppenderAdapterKey = "console"
 
+	FileAppenderAdapterKey = "file"
+
 	TRACELevel = "TRACE"
 	DEBUGLevel = "DEBUG"
 	INFOLevel  = "INFO"

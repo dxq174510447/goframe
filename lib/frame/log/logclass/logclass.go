@@ -53,6 +53,7 @@ type LogAppenderEncodeXmlEle struct {
 type LogAppenderXmlEle struct {
 	Name    string                     `xml:"name,attr"`
 	Clazz   string                     `xml:"class,attr"`
+	File    string                     `xml:"file"`
 	Encoder []*LogAppenderEncodeXmlEle `xml:"encoder"`
 }
 
