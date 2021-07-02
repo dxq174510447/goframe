@@ -40,6 +40,8 @@ var msg1 = regexp.MustCompile("%(\\-\\d+)?msg")
 var br = regexp.MustCompile("%(\\-\\d+)?n")
 var logger1 = regexp.MustCompile("%(\\-\\d+)?logger(\\{[^\\}]+\\})?")
 
+var property1 = regexp.MustCompile("%(\\-\\d+)?property(\\{[^\\}]+\\})?")
+
 // %date %date{HH:mm:ss.SSS} %{-n}thread %{-n}level %logger{n} %line %file %msg %n
 type LogMessage struct {
 	Name     string
@@ -50,6 +52,7 @@ type LogMessage struct {
 	Err      interface{}
 	Thread   string
 	Date     *time.Time
+	Context  *context.LocalStack
 }
 type PatternLayout struct {
 	Pattern         string
@@ -58,15 +61,16 @@ type PatternLayout struct {
 	Target          io.Writer
 }
 
-// err可nil
-func (p *PatternLayout) DoLayout(local *context.LocalStack, config *logclass.LoggerConfig, row string, err interface{}) {
+//DoLayout err可nil   Target如果是空 就直接返回byte 交给上层处理 ,Target不为空 直接返回空
+func (p *PatternLayout) DoLayout(local *context.LocalStack, level string, config *logclass.LoggerConfig, row string, err interface{}) []byte {
 	t1 := time.Now()
 	msg := &LogMessage{
-		Name:  config.Name,
-		Level: config.Level,
-		Msg:   row,
-		Err:   err,
-		Date:  &t1,
+		Name:    config.Name,
+		Level:   level,
+		Msg:     row,
+		Err:     err,
+		Date:    &t1,
+		Context: local,
 	}
 	if p.HasRuntimeParam {
 		_, file2, line, ok := runtime.Caller(3)
@@ -88,16 +92,36 @@ func (p *PatternLayout) DoLayout(local *context.LocalStack, config *logclass.Log
 
 	// fmt.Println(util.JsonUtil.To2String(msg))
 	if err == nil {
-		err1 := p.Tpl.Execute(p.Target, msg)
-		if err1 != nil {
-			panic(err1)
+		if p.Target != nil {
+			err1 := p.Tpl.Execute(p.Target, msg)
+			if err1 != nil {
+				panic(err1)
+			}
+			return nil
+		} else {
+			buf := &bytes.Buffer{}
+			err1 := p.Tpl.Execute(buf, msg)
+			if err1 != nil {
+				panic(err1)
+			}
+			return buf.Bytes()
 		}
 	} else {
 		rtErr := reflect.ValueOf(err)
 		if rtErr.IsZero() {
-			err1 := p.Tpl.Execute(p.Target, msg)
-			if err1 != nil {
-				panic(err1)
+			if p.Target != nil {
+				err1 := p.Tpl.Execute(p.Target, msg)
+				if err1 != nil {
+					panic(err1)
+				}
+				return nil
+			} else {
+				buf := &bytes.Buffer{}
+				err1 := p.Tpl.Execute(buf, msg)
+				if err1 != nil {
+					panic(err1)
+				}
+				return buf.Bytes()
 			}
 		} else {
 			buf := &bytes.Buffer{}
@@ -113,10 +137,15 @@ func (p *PatternLayout) DoLayout(local *context.LocalStack, config *logclass.Log
 				err2 := fmt.Sprintf("%s", err)
 				buf.Write([]byte(err2))
 			}
-			stack := strings.Join(strings.Split(string(debug.Stack()), "\n")[6:], "\n")
+			stack := strings.Join(strings.Split(string(debug.Stack()), "\n")[4:], "\n")
 			buf.Write([]byte(stack))
 			buf.Write([]byte("\n"))
-			p.Target.Write(buf.Bytes())
+			if p.Target != nil {
+				p.Target.Write(buf.Bytes())
+				return nil
+			} else {
+				return buf.Bytes()
+			}
 		}
 	}
 
@@ -202,6 +231,28 @@ var layOutFuncMap = template.FuncMap{
 		}
 		copy(sp, n)
 		return string(sp)
+	},
+	"propertyLogger": func(size int, propertyName string, msg *LogMessage) string {
+		var rowMsg string = "-"
+		if msg.Context != nil {
+			r := msg.Context.Get(propertyName)
+			if r != nil {
+				rv := reflect.ValueOf(r)
+				switch rv.Kind() {
+				case reflect.String:
+					rowMsg = r.(string)
+				case reflect.Int:
+					r1 := r.(int)
+					rowMsg = strconv.Itoa(r1)
+				case reflect.Int64:
+					r1 := r.(int64)
+					rowMsg = strconv.FormatInt(r1, 10)
+				default:
+					rowMsg = fmt.Sprintf("%s格式识别不到", propertyName)
+				}
+			}
+		}
+		return rowMsg
 	},
 }
 
@@ -302,6 +353,25 @@ func NewLayout(pattern string, writer io.Writer) *PatternLayout {
 		return fmt.Sprintf(`{{logLogger %d %d .}}`, maxSize, clazzSize)
 	})
 
+	f = property1.ReplaceAllStringFunc(f, func(row string) string {
+		//return fmt.Sprintf(`{{logBr %d}}`,0)
+		p := strings.Index(row, "-")
+		maxSize := 0
+		if p >= 0 {
+			p1 := strings.Index(row, "property")
+			maxSizeStr := row[p+1 : p1]
+			maxSize, _ = strconv.Atoi(maxSizeStr)
+		}
+
+		p1 := strings.Index(row, "{")
+		propertyName := "-"
+		if p1 >= 0 {
+			p2 := strings.Index(row, "}")
+			propertyName = row[p1+1 : p2]
+		}
+		return fmt.Sprintf(`{{propertyLogger %d "%s" .}}`, maxSize, propertyName)
+	})
+
 	l.Tpl = template.Must(template.New(fmt.Sprintf("%s-%s-loglayout",
 		util.DateUtil.FormatNowByType(util.DatePattern2),
 		util.StringUtil.GetRandomStr(7))).Funcs(layOutFuncMap).Parse(f))
@@ -317,8 +387,8 @@ type FileAppenderImpl struct {
 	FileBuffer *bufio.Writer
 }
 
-func (f *FileAppenderImpl) AppendRow(local *context.LocalStack, config *logclass.LoggerConfig, row string, err interface{}) {
-	f.Layout.DoLayout(local, config, row, err)
+func (f *FileAppenderImpl) AppendRow(local *context.LocalStack, level string, config *logclass.LoggerConfig, row string, err interface{}) {
+	f.Layout.DoLayout(local, level, config, row, err)
 	f.FileBuffer.Flush()
 }
 
@@ -363,8 +433,8 @@ func (c *ConsoleAppenderImpl) NewAppender(ele *logclass.LogAppenderXmlEle) logcl
 	return logclass.LogAppender(result)
 }
 
-func (c *ConsoleAppenderImpl) AppendRow(local *context.LocalStack, config *logclass.LoggerConfig, row string, err interface{}) {
-	c.Layout.DoLayout(local, config, row, err)
+func (c *ConsoleAppenderImpl) AppendRow(local *context.LocalStack, level string, config *logclass.LoggerConfig, row string, err interface{}) {
+	c.Layout.DoLayout(local, level, config, row, err)
 	os.Stdout.Sync()
 }
 
@@ -381,7 +451,7 @@ func (l *Logger) Trace(local *context.LocalStack, format string, a ...interface{
 	current := l.Config
 	for current != nil && l.isLevelEnable(TRACELevel, current) {
 		for _, appender := range current.Appender {
-			appender.AppendRow(local, l.Config, content, nil)
+			appender.AppendRow(local, TRACELevel, l.Config, content, nil)
 		}
 		if !current.Additivity {
 			break
@@ -403,7 +473,7 @@ func (l *Logger) Debug(local *context.LocalStack, format string, a ...interface{
 	current := l.Config
 	for current != nil && l.isLevelEnable(DEBUGLevel, current) {
 		for _, appender := range current.Appender {
-			appender.AppendRow(local, l.Config, content, nil)
+			appender.AppendRow(local, DEBUGLevel, l.Config, content, nil)
 		}
 		if !current.Additivity {
 			break
@@ -429,7 +499,7 @@ func (l *Logger) Info(local *context.LocalStack, format string, a ...interface{}
 	current := l.Config
 	for current != nil && l.isLevelEnable(INFOLevel, current) {
 		for _, appender := range current.Appender {
-			appender.AppendRow(local, l.Config, content, nil)
+			appender.AppendRow(local, INFOLevel, l.Config, content, nil)
 		}
 		if !current.Additivity {
 			break
@@ -451,7 +521,7 @@ func (l *Logger) Warn(local *context.LocalStack, format string, a ...interface{}
 	current := l.Config
 	for current != nil && l.isLevelEnable(WARNLevel, current) {
 		for _, appender := range current.Appender {
-			appender.AppendRow(local, l.Config, content, nil)
+			appender.AppendRow(local, WARNLevel, l.Config, content, nil)
 		}
 		if !current.Additivity {
 			break
@@ -473,7 +543,7 @@ func (l *Logger) Error(local *context.LocalStack, err interface{}, format string
 	current := l.Config
 	for current != nil && l.isLevelEnable(ERRORLevel, current) {
 		for _, appender := range current.Appender {
-			appender.AppendRow(local, l.Config, content, err)
+			appender.AppendRow(local, ERRORLevel, l.Config, content, err)
 		}
 		if !current.Additivity {
 			break
