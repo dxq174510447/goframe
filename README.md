@@ -66,6 +66,11 @@
 ### 20210613-20210625 v1.1.3
 1. yaml项目变更，触发注入的配置实例变更
 2. 引入事件监听模型(完成)
-3. 优化logger，引入file，rollingfile appender
+3. 优化logger，引入file，rollingfile appender(部分完成)
 4. 修复database filter，针对返回error触发回滚（之前是panic）(完成)
 5. 将http渲染组件化(完成)
+
+### 20210705-20210718 v1.1.5
+1. yaml配置变更，触发注入的配置实例变更
+2. rollingfile appender
+3. 引入接口注入
