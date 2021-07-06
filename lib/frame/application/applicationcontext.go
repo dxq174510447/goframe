@@ -357,7 +357,7 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 					}
 					if ele, ok1 := pl.ElementMap[key]; ok1 {
 						if ele.Target != nil {
-							a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", current.Id, field.Name, ele.Id)
+							a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", ele1.Id, field.Name, ele.Id)
 							reflect.ValueOf(ele1.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
 						}
 					} else {
