@@ -137,7 +137,7 @@ func (p *PatternLayout) DoLayout(local *context.LocalStack, level string, config
 				err2 := fmt.Sprintf("%s", err)
 				buf.Write([]byte(err2))
 			}
-			stack := strings.Join(strings.Split(string(debug.Stack()), "\n")[4:], "\n")
+			stack := strings.Join(strings.Split(string(debug.Stack()), "\n")[7:], "\n")
 			buf.Write([]byte(stack))
 			buf.Write([]byte("\n"))
 			if p.Target != nil {
