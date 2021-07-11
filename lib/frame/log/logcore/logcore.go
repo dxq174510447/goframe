@@ -54,6 +54,7 @@ type LogMessage struct {
 	Date     *time.Time
 	Context  *context.LocalStack
 }
+
 type PatternLayout struct {
 	Pattern         string
 	HasRuntimeParam bool
@@ -256,7 +257,34 @@ var layOutFuncMap = template.FuncMap{
 	},
 }
 
-func NewLayout(pattern string, writer io.Writer) *PatternLayout {
+// SetAppender 设置appender一些公用节点
+func SetAppender(ele *logclass.LogAppenderXmlEle, writer io.Writer, appender logclass.LogAppender) {
+	var filters []logclass.LogFilter
+	var layout *PatternLayout
+	if len(ele.Filter) > 0 {
+		for _, filter := range ele.Filter {
+			if filter.Clazz == "" {
+				continue
+			}
+			if f, ok := buildInFilter[strings.ToLower(filter.Clazz)]; ok {
+				nf := f.NewFilter(filter)
+				if nf != nil {
+					filters = append(filters, nf)
+				}
+			}
+		}
+	}
+	layout = newLayout(ele.Encoder[0].Pattern, writer)
+
+	p := logclass.AppenderProperty{
+		Filter: filters,
+		Layout: layout,
+	}
+
+	appender.SetAppenderProperty(&p)
+}
+
+func newLayout(pattern string, writer io.Writer) *PatternLayout {
 	l := &PatternLayout{
 		Pattern:         pattern,
 		HasRuntimeParam: false,
@@ -380,7 +408,7 @@ func NewLayout(pattern string, writer io.Writer) *PatternLayout {
 }
 
 type FileAppenderImpl struct {
-	Layout     *PatternLayout
+	Property   *logclass.AppenderProperty
 	Target     io.Writer
 	FilePath   string
 	FileTarget *os.File
@@ -388,12 +416,18 @@ type FileAppenderImpl struct {
 }
 
 func (f *FileAppenderImpl) AppendRow(local *context.LocalStack, level string, config *logclass.LoggerConfig, row string, err interface{}) {
-	f.Layout.DoLayout(local, level, config, row, err)
-	f.FileBuffer.Flush()
+	if IsAppendRow(local, level, config, f.Property) {
+		f.Property.Layout.DoLayout(local, level, config, row, err)
+		f.FileBuffer.Flush()
+	}
 }
 
 func (f *FileAppenderImpl) AppenderKey() string {
 	return FileAppenderAdapterKey
+}
+
+func (f *FileAppenderImpl) SetAppenderProperty(property *logclass.AppenderProperty) {
+	f.Property = property
 }
 
 func (f *FileAppenderImpl) NewAppender(ele *logclass.LogAppenderXmlEle) logclass.LogAppender {
@@ -404,20 +438,20 @@ func (f *FileAppenderImpl) NewAppender(ele *logclass.LogAppenderXmlEle) logclass
 	}
 	bufferWriter := bufio.NewWriter(fileTarget)
 
-	layout := NewLayout(ele.Encoder[0].Pattern, bufferWriter)
+	//layout := NewLayout(ele.Encoder[0].Pattern, bufferWriter)
 	result := &FileAppenderImpl{
-		Layout:     layout,
 		Target:     bufferWriter,
 		FileTarget: fileTarget,
 		FilePath:   ele.File,
 		FileBuffer: bufferWriter,
 	}
+	SetAppender(ele, bufferWriter, result)
 	return logclass.LogAppender(result)
 }
 
 type ConsoleAppenderImpl struct {
-	Layout *PatternLayout
-	Target io.Writer
+	Property *logclass.AppenderProperty
+	Target   io.Writer
 }
 
 func (c *ConsoleAppenderImpl) AppenderKey() string {
@@ -425,17 +459,85 @@ func (c *ConsoleAppenderImpl) AppenderKey() string {
 }
 
 func (c *ConsoleAppenderImpl) NewAppender(ele *logclass.LogAppenderXmlEle) logclass.LogAppender {
-	layout := NewLayout(ele.Encoder[0].Pattern, os.Stdout)
+	//layout := NewLayout(ele.Encoder[0].Pattern, os.Stdout)
 	result := &ConsoleAppenderImpl{
-		Layout: layout,
 		Target: os.Stdout,
 	}
+	SetAppender(ele, os.Stdout, result)
 	return logclass.LogAppender(result)
 }
 
+func (c *ConsoleAppenderImpl) SetAppenderProperty(property *logclass.AppenderProperty) {
+	c.Property = property
+}
+
 func (c *ConsoleAppenderImpl) AppendRow(local *context.LocalStack, level string, config *logclass.LoggerConfig, row string, err interface{}) {
-	c.Layout.DoLayout(local, level, config, row, err)
-	os.Stdout.Sync()
+	if IsAppendRow(local, level, config, c.Property) {
+		c.Property.Layout.DoLayout(local, level, config, row, err)
+		os.Stdout.Sync()
+	}
+}
+
+type LevelFilter struct {
+	Level      string
+	OnMatch    string
+	OnMismatch string
+}
+
+func (l *LevelFilter) LogDecide(local *context.LocalStack, level string, config *logclass.LoggerConfig) string {
+	if level == l.Level {
+		return l.OnMatch
+	}
+	return l.OnMismatch
+}
+
+func (l *LevelFilter) FilterKey() string {
+	return LevelFilterAdapterKey
+}
+
+func (l *LevelFilter) NewFilter(ele *logclass.LogFilterXmlEle) logclass.LogFilter {
+	onMath := ele.OnMatch
+	onMismatch := ele.OnMismatch
+	level := ele.Level
+	if level == "" {
+		level = DEBUGLevel
+	}
+	if onMath == "" {
+		onMath = NEUTRALFilterReplay
+	}
+	if onMismatch == "" {
+		onMismatch = NEUTRALFilterReplay
+	}
+	return &LevelFilter{
+		Level:      strings.ToUpper(level),
+		OnMatch:    strings.ToUpper(onMath),
+		OnMismatch: strings.ToUpper(onMismatch),
+	}
+}
+
+type ThresholdFilter struct {
+	Level string
+}
+
+func (l *ThresholdFilter) LogDecide(local *context.LocalStack, level string, config *logclass.LoggerConfig) string {
+	m := LogLevelValue[level] - LogLevelValue[l.Level]
+	if m >= 0 {
+		return NEUTRALFilterReplay
+	}
+	return DENYFilterReplay
+}
+
+func (l *ThresholdFilter) FilterKey() string {
+	return ThresholdFilterAdapterKey
+}
+func (l *ThresholdFilter) NewFilter(ele *logclass.LogFilterXmlEle) logclass.LogFilter {
+	level := ele.Level
+	if level == "" {
+		level = DEBUGLevel
+	}
+	return &ThresholdFilter{
+		Level: strings.ToUpper(level),
+	}
 }
 
 type Logger struct {
@@ -558,10 +660,20 @@ func (l *Logger) IsErrorEnable() bool {
 
 var console ConsoleAppenderImpl = ConsoleAppenderImpl{}
 var file FileAppenderImpl = FileAppenderImpl{}
+var rollingfile RollingFileAppenderImpl = RollingFileAppenderImpl{}
 
 var buildInAppender map[string]logclass.LogAppender = map[string]logclass.LogAppender{
-	ConsoleAppenderAdapterKey: logclass.LogAppender(&console),
-	FileAppenderAdapterKey:    logclass.LogAppender(&file),
+	ConsoleAppenderAdapterKey:     logclass.LogAppender(&console),
+	FileAppenderAdapterKey:        logclass.LogAppender(&file),
+	RollingFileAppenderAdapterKey: logclass.LogAppender(&rollingfile),
+}
+
+var levelFilter LevelFilter = LevelFilter{}
+var thresholdFilter ThresholdFilter = ThresholdFilter{}
+
+var buildInFilter map[string]logclass.LogFilter = map[string]logclass.LogFilter{
+	LevelFilterAdapterKey:     logclass.LogFilter(&levelFilter),
+	ThresholdFilterAdapterKey: logclass.LogFilter(&thresholdFilter),
 }
 
 type LogFactory struct {
@@ -774,6 +886,29 @@ func (l *LogFactory) ProxyTarget() *proxyclass.ProxyClass {
 func AddLogAppender(appender logclass.LogAppender) {
 	key := appender.AppenderKey()
 	buildInAppender[key] = appender
+}
+
+func AddLogFilter(filter logclass.LogFilter) {
+	key := filter.FilterKey()
+	buildInFilter[key] = filter
+}
+
+//IsAppendRow 是否过滤掉日志
+func IsAppendRow(local *context.LocalStack, level string, config *logclass.LoggerConfig, property *logclass.AppenderProperty) bool {
+	if len(property.Filter) == 0 {
+		return true
+	}
+	for _, filter := range property.Filter {
+		m := filter.LogDecide(local, level, config)
+		m = strings.ToUpper(m)
+		if m == DENYFilterReplay {
+			return false
+		}
+		if m == ACCEPTFilterReplay {
+			return true
+		}
+	}
+	return true
 }
 
 var logFactory LogFactory = LogFactory{}
