@@ -53,6 +53,7 @@ func AddAppLogConfig(name string, config string) {
 
 // RegisterInterfaceType 接口类型 可以见RegisterInterfaceType(ApplicationContextListenerType)
 // 后面可以通过applicationContext.GetProxyInsByInterfaceType 获取
+// 因为go不能通过struct反推出它所包含的接口,所以先把所有接口注入到容器，在注入struct的时候和接口一个个比较
 func RegisterInterfaceType(t reflect.Type) {
 	resourcePool.RegisterInterfaceType(t)
 }

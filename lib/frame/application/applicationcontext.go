@@ -39,6 +39,14 @@ func (f *FrameApplicationContext) GetProxyInsByInterfaceType(t reflect.Type) []p
 	return targets
 }
 
+func (f *FrameApplicationContext) GetProxyInByInterfaceType(local *context.LocalStack, t reflect.Type) interface{} {
+	ts := f.GetProxyInsByInterfaceType(t)
+	if len(ts) > 0 {
+		return ts[0]
+	}
+	return nil
+}
+
 func (f *FrameApplicationContext) GetProxyInsById(id string) proxyclass.ProxyTarger {
 	if result, ok := f.FrameResource.ProxyInsPool.ElementMap[id]; !ok {
 		return nil
