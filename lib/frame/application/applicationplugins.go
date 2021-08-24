@@ -153,13 +153,24 @@ type FrameLoadInstanceHandler interface {
 type DynamicProxyLinkedArray struct {
 	FirstElement *DynamicProxyInstanceNode
 
+	// id 对应 节点
 	ElementMap map[string]*DynamicProxyInstanceNode
+
+	// 注入interface到时候
+	interfaceInjectType []reflect.Type
 
 	LastElement *DynamicProxyInstanceNode
 }
 
-func (d *DynamicProxyLinkedArray) AddHead(node *DynamicProxyInstanceNode) {
+func (d *DynamicProxyLinkedArray) init() {
+	if d.ElementMap != nil {
+		return
+	}
+	d.ElementMap = make(map[string]*DynamicProxyInstanceNode)
+}
 
+func (d *DynamicProxyLinkedArray) AddHead(node *DynamicProxyInstanceNode) {
+	d.init()
 	if node.Target != nil {
 		target := node.Target
 		node.rt = reflect.TypeOf(target)
@@ -169,7 +180,20 @@ func (d *DynamicProxyLinkedArray) AddHead(node *DynamicProxyInstanceNode) {
 			for i := 0; i < fieldNum; i++ {
 				field := node.rt.Elem().Field(i)
 				if _, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
-					node.autowiredInjectField = append(node.autowiredInjectField, &field)
+					node.instanceInject = append(node.instanceInject, &field)
+					if field.Type.Kind() == reflect.Interface {
+						add := false
+						// 数据量小的时候 比hash快
+						for _, ft := range d.interfaceInjectType {
+							if ft == field.Type {
+								add = true
+								break
+							}
+						}
+						if !add {
+							d.interfaceInjectType = append(d.interfaceInjectType, field.Type)
+						}
+					}
 				}
 
 				if _, ok := field.Tag.Lookup(ValueInjectKey); ok {
@@ -199,17 +223,30 @@ func (d *DynamicProxyLinkedArray) AddHead(node *DynamicProxyInstanceNode) {
 }
 
 func (d *DynamicProxyLinkedArray) Push(node *DynamicProxyInstanceNode) {
-
+	d.init()
 	if node.Target != nil {
 		target := node.Target
-		node.rt = reflect.TypeOf(target)
 		node.rv = reflect.ValueOf(target)
+		node.rt = reflect.ValueOf(target).Type()
 		fieldNum := node.rt.Elem().NumField()
 		if fieldNum > 0 {
 			for i := 0; i < fieldNum; i++ {
 				field := node.rt.Elem().Field(i)
 				if _, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
-					node.autowiredInjectField = append(node.autowiredInjectField, &field)
+					node.instanceInject = append(node.instanceInject, &field)
+					if field.Type.Kind() == reflect.Interface {
+						add := false
+						// 数据量小的时候 比hash快
+						for _, ft := range d.interfaceInjectType {
+							if ft == field.Type {
+								add = true
+								break
+							}
+						}
+						if !add {
+							d.interfaceInjectType = append(d.interfaceInjectType, field.Type)
+						}
+					}
 				}
 
 				if _, ok := field.Tag.Lookup(ValueInjectKey); ok {
@@ -251,7 +288,7 @@ type DynamicProxyInstanceNode struct {
 	configInjectField []*reflect.StructField
 
 	// push的时候设置
-	autowiredInjectField []*reflect.StructField
+	instanceInject []*reflect.StructField
 }
 
 type InsValueInjectTree struct {

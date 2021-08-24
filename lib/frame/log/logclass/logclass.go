@@ -1,6 +1,8 @@
 package logclass
 
-import "github.com/dxq174510447/goframe/lib/frame/context"
+import (
+	"github.com/dxq174510447/goframe/lib/frame/context"
+)
 
 // logback相关
 
@@ -16,6 +18,26 @@ type LogAppender interface {
 	AppendRow(local *context.LocalStack, level string, config *LoggerConfig, row string, err interface{})
 	AppenderKey() string
 	NewAppender(ele *LogAppenderXmlEle) LogAppender
+	SetAppenderProperty(property *AppenderProperty)
+}
+
+type LogLayouter interface {
+	DoLayout(local *context.LocalStack, level string, config *LoggerConfig, row string, err interface{}) []byte
+}
+
+type AppenderProperty struct {
+	Filter []LogFilter
+	Layout LogLayouter
+}
+
+type LogFilter interface {
+
+	// LogDecide 返回DENY NEUTRAL ACCEPT
+	LogDecide(local *context.LocalStack, level string, config *LoggerConfig) string
+
+	FilterKey() string
+
+	NewFilter(ele *LogFilterXmlEle) LogFilter
 }
 
 type LoggerConfig struct {
@@ -51,10 +73,26 @@ type LogAppenderEncodeXmlEle struct {
 	Pattern string `xml:"pattern"`
 }
 type LogAppenderXmlEle struct {
-	Name    string                     `xml:"name,attr"`
-	Clazz   string                     `xml:"class,attr"`
-	File    string                     `xml:"file"`
-	Encoder []*LogAppenderEncodeXmlEle `xml:"encoder"`
+	Name          string                     `xml:"name,attr"`
+	Clazz         string                     `xml:"class,attr"`
+	File          string                     `xml:"file"`
+	Append        string                     `xml:"append"` // true false 默认true
+	Encoder       []*LogAppenderEncodeXmlEle `xml:"encoder"`
+	Filter        []*LogFilterXmlEle         `xml:"filter"`
+	RollingPolicy *LogRollingPolicyXmlEle    `xml:"rollingPolicy"`
+}
+
+type LogRollingPolicyXmlEle struct {
+	FileNamePattern string `xml:"fileNamePattern"`
+	MaxHistory      string `xml:"maxHistory"`
+	MaxFileSize     string `xml:"maxFileSize"`
+}
+
+type LogFilterXmlEle struct {
+	Clazz      string `xml:"class,attr"`
+	Level      string `xml:"level"`
+	OnMatch    string `xml:"onMatch"`
+	OnMismatch string `xml:"onMismatch"`
 }
 
 type LogAppenderRefXmlEle struct {

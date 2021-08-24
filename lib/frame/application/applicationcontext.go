@@ -252,14 +252,32 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 	// 第一轮注入的时候 找不到对象 可能是factoryer还没生成 暂时只支持2轮
 	firstNilInject := make([]*DynamicProxyInstanceNode, 0, 30)
 
+	var interfaceMap map[string]*DynamicProxyInstanceNode = make(map[string]*DynamicProxyInstanceNode)
 	for current != nil {
-		a.logger.Debug(local, "[初始化] 实例加载 %s %s 开始", current.Id, util.ClassUtil.GetJavaClassNameByType(current.rt.Elem()))
-		if len(current.autowiredInjectField) > 0 || len(current.configInjectField) > 0 {
-			//injectTarget = append(injectTarget, current)
-			// 类型注入
-			for _, field := range current.autowiredInjectField {
 
-				// 特殊类型 日志类型注入
+		for _, interType := range pl.interfaceInjectType {
+			if current.rt.Implements(interType) {
+				key := util.ClassUtil.GetClassNameByType(interType)
+				if m1, ok := interfaceMap[key]; ok {
+					if m1 == current {
+						continue
+					}
+					panic(fmt.Errorf("%s 接口的实现有多个 %s %s 不能直接注入", key,
+						util.ClassUtil.GetClassNameByType(m1.rt.Elem()),
+						util.ClassUtil.GetClassNameByType(current.rt.Elem())))
+				} else {
+					interfaceMap[key] = current
+				}
+			}
+		}
+
+		a.logger.Debug(local, "[初始化] 实例加载 %s %s 开始", current.Id, util.ClassUtil.GetJavaClassNameByType(current.rt.Elem()))
+
+		if len(current.instanceInject) > 0 || len(current.configInjectField) > 0 {
+
+			// 类型注入
+			for _, field := range current.instanceInject {
+
 				if field.Type == FrameLogLoggerType {
 					a.logger.Debug(local, "[初始化] 实例加载 %s %s 日志注入", current.Id, field.Name)
 					if a.LogFactory != nil {
@@ -271,15 +289,40 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 
 				// 安类型 或者id注入
 				if key, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
-					if key == "" {
-						key = util.ClassUtil.GetClassNameByType(field.Type.Elem())
-					}
-					if ele, ok1 := pl.ElementMap[key]; ok1 {
-						if ele.Target != nil {
-							a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", current.Id, field.Name, ele.Id)
-							reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
+
+					var inject bool = false
+					if key != "" {
+						if ele, ok1 := pl.ElementMap[key]; ok1 {
+							if ele.Target != nil {
+								a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", current.Id, field.Name, ele.Id)
+								reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
+								inject = true
+							}
 						}
 					} else {
+						if field.Type.Kind() == reflect.Interface {
+							name := util.ClassUtil.GetClassNameByType(field.Type)
+							if ele, ok1 := interfaceMap[name]; ok1 {
+								if ele.Target != nil {
+									a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", current.Id, field.Name, ele.Id)
+									reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
+									inject = true
+								}
+							}
+						} else {
+							//指针注入
+							name := util.ClassUtil.GetClassNameByType(field.Type.Elem())
+							if ele, ok1 := pl.ElementMap[name]; ok1 {
+								if ele.Target != nil {
+									a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", current.Id, field.Name, ele.Id)
+									reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
+									inject = true
+								}
+							}
+						}
+					}
+
+					if !inject {
 						firstNilInject = append(firstNilInject, current)
 					}
 				}
@@ -344,34 +387,65 @@ func (a *FrameApplication) RefreshContext(local *context.LocalStack, application
 		current = current.Next
 	}
 
+	// 第二轮注入
 	for _, ele1 := range firstNilInject {
+
 		if ele1 == nil {
 			continue
 		}
-		// 类型注入
-		for _, field := range ele1.autowiredInjectField {
+
+		for _, field := range ele1.instanceInject {
 
 			// 特殊类型 日志类型注入 第一轮已经注入
 			if field.Type == FrameLogLoggerType {
 				continue
 			}
 
-			// 安类型 或者id注入
 			if key, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
 				// 字段值为空的话 第二轮注入
-				if reflect.ValueOf(ele1.Target).Elem().FieldByName(field.Name).IsZero() {
-					if key == "" {
-						key = util.ClassUtil.GetClassNameByType(field.Type.Elem())
-					}
+				zer := reflect.ValueOf(ele1.Target).Elem().FieldByName(field.Name).IsZero()
+				if !zer {
+					continue
+				}
+
+				var inject bool = false
+				if key != "" {
 					if ele, ok1 := pl.ElementMap[key]; ok1 {
 						if ele.Target != nil {
 							a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", ele1.Id, field.Name, ele.Id)
 							reflect.ValueOf(ele1.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
+							inject = true
+						}
+					}
+				} else {
+					if field.Type.Kind() == reflect.Interface {
+						name := util.ClassUtil.GetClassNameByType(field.Type)
+						if ele, ok1 := interfaceMap[name]; ok1 {
+							if ele.Target != nil {
+								a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", ele1.Id, field.Name, ele.Id)
+								reflect.ValueOf(ele1.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
+								inject = true
+							}
 						}
 					} else {
-						//firstNilInject = append(firstNilInject,current)
+						//指针注入
+						name := util.ClassUtil.GetClassNameByType(field.Type.Elem())
+						if ele, ok1 := pl.ElementMap[name]; ok1 {
+							if ele.Target != nil {
+								a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", ele1.Id, field.Name, ele.Id)
+								reflect.ValueOf(ele1.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
+								inject = true
+							}
+						}
 					}
 				}
+
+				if !inject {
+					panic(fmt.Sprintf("找不到 类型 %s 的属性 %s 的实现类",
+						util.ClassUtil.GetClassNameByType(ele1.rt.Elem()),
+						field.Name))
+				}
+
 			}
 		}
 	}
