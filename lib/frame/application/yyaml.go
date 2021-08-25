@@ -34,7 +34,7 @@ type YamlNode struct {
 type YamlTree struct {
 	Root    *YamlNode
 	RefNode map[string]*YamlNode
-	AppArgs *DefaultApplicationArguments
+	AppArgs *ApplicationArguments
 }
 
 func (y *YamlTree) innerPrintTree(node *YamlNode, depth int) {

@@ -2,12 +2,7 @@ package util
 
 import (
 	"math/rand"
-	"regexp"
 )
-
-var removeEmptyRowReg *regexp.Regexp = regexp.MustCompile(`(?m)^\s*$\n`)
-
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 type stringUtil struct {
 }

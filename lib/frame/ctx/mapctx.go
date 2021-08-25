@@ -19,6 +19,10 @@ func (m *StackCtx) Value(key interface{}) interface{} {
 		key1 = fmt.Sprintf("%s", key)
 	}
 
+	// 销毁
+	if m.stack == nil {
+		return nil
+	}
 	v := m.stack.Get(key1)
 	if v != nil {
 		return v
@@ -60,6 +64,13 @@ func WithStackPeek(ctx context.Context) map[string]interface{} {
 		return mapCtx.stack.Peek()
 	}
 	return nil
+}
+
+func Destory(ctx context.Context) {
+	if mapCtx, ok := ctx.(*StackCtx); ok {
+		mapCtx.stack.Destroy()
+		mapCtx.stack = nil
+	}
 }
 
 func WithValue(ctx context.Context, key string, val interface{}) context.Context {

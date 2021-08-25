@@ -1,8 +1,6 @@
 package application
 
 import (
-	"github.com/dxq174510447/goframe/lib/frame/context"
-	"github.com/dxq174510447/goframe/lib/frame/log/logclass"
 	"github.com/dxq174510447/goframe/lib/frame/util"
 	"reflect"
 )
@@ -28,23 +26,13 @@ const (
 var ApplicationContextListenerType reflect.Type = reflect.Zero(reflect.TypeOf((*ApplicationContextListener)(nil)).Elem()).Type()
 var ApplicationContextListenerTypeName string = util.ClassUtil.GetClassNameByType(ApplicationContextListenerType)
 
-var FrameLoadInstanceHandlerType reflect.Type = reflect.Zero(reflect.TypeOf((*FrameLoadInstanceHandler)(nil)).Elem()).Type()
-var FrameLoadInstanceHandlerTypeName string = util.ClassUtil.GetClassNameByType(FrameLoadInstanceHandlerType)
+var LoadInstanceHandlerType reflect.Type = reflect.Zero(reflect.TypeOf((*LoadInstanceHandler)(nil)).Elem()).Type()
+var LoadInstanceHandlerTypeName string = util.ClassUtil.GetClassNameByType(LoadInstanceHandlerType)
 
-var FrameLogFactoryerType reflect.Type = reflect.Zero(reflect.TypeOf((*logclass.AppLogFactoryer)(nil)).Elem()).Type()
-var FrameLogFactoryerTypeName string = util.ClassUtil.GetClassNameByType(FrameLogFactoryerType)
+var AppLogerType reflect.Type = reflect.Zero(reflect.TypeOf((*AppLoger)(nil)).Elem()).Type()
+var AppLogerTypeName string = util.ClassUtil.GetClassNameByType(AppLogerType)
 
-var FrameLogLoggerType reflect.Type = reflect.Zero(reflect.TypeOf((*logclass.AppLoger)(nil)).Elem()).Type()
-
-func SetEnvironmentToApplication(local *context.LocalStack, env *ConfigurableEnvironment) {
-	local.Set(FrameEnvironmentKey, env)
-}
-
-// GetEnvironmentFromApplication 如果上下文已经有环境上下文 就使用上一次
-func GetEnvironmentFromApplication(local *context.LocalStack) *ConfigurableEnvironment {
-	m := local.Get(FrameEnvironmentKey)
-	if m == nil {
-		return nil
-	}
-	return m.(*ConfigurableEnvironment)
-}
+//var FrameLogFactoryerType reflect.Type = reflect.Zero(reflect.TypeOf((*logclass.AppLogFactoryer)(nil)).Elem()).Type()
+//var FrameLogFactoryerTypeName string = util.ClassUtil.GetClassNameByType(FrameLogFactoryerType)
+//
+//var FrameLogLoggerType reflect.Type = reflect.Zero(reflect.TypeOf((*logclass.AppLoger)(nil)).Elem()).Type()

@@ -1,7 +1,7 @@
 package application
 
 import (
-	"github.com/dxq174510447/goframe/lib/frame/context"
+	"context"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"github.com/dxq174510447/goframe/lib/frame/util"
 	"os"
@@ -9,73 +9,87 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"text/template"
 )
 
 type HttpStarter interface {
-	HttpStart(local *context.LocalStack, applicationContext *FrameApplicationContext)
+	HttpStart(local context.Context, applicationContext *ApplicationContext)
 }
 
-type ProxyInstanceAdapter interface {
-	// AdapterKey 返回长度1-2个
-	AdapterKey() []string
-}
+//type ProxyInstanceAdapter interface {
+//	// AdapterKey 返回长度1-2个
+//	AdapterKey() []string
+//}
 
+/**
+应用启动事件监听器
+*/
 type ApplicationContextListener interface {
-	Starting(local *context.LocalStack)
+	Starting(local context.Context)
 
-	EnvironmentPrepared(local *context.LocalStack, environment *ConfigurableEnvironment)
+	EnvironmentPrepared(local context.Context, appConfig *ApplicationConfig)
 
-	Running(local *context.LocalStack, application *FrameApplicationContext)
+	Running(local context.Context, applicationContext *ApplicationContext)
 
-	Failed(local *context.LocalStack, application *FrameApplicationContext, err interface{})
+	Failed(local context.Context, applicationContext *ApplicationContext, err interface{})
 
 	Order() int
 }
 
+/**
+启动事件统一处理
+*/
 type ApplicationRunContextListeners struct {
 	ApplicationListeners []ApplicationContextListener
-	Args                 *DefaultApplicationArguments
+	Args                 *ApplicationArguments
 }
 
-func (a *ApplicationRunContextListeners) Starting(local *context.LocalStack) {
+func (a *ApplicationRunContextListeners) Starting(local context.Context) {
 	for _, m := range a.ApplicationListeners {
 		m.Starting(local)
 	}
 }
-func (a *ApplicationRunContextListeners) EnvironmentPrepared(local *context.LocalStack, environment *ConfigurableEnvironment) {
+func (a *ApplicationRunContextListeners) EnvironmentPrepared(local context.Context, environment *ApplicationConfig) {
 	for _, m := range a.ApplicationListeners {
 		m.EnvironmentPrepared(local, environment)
 	}
 }
-func (a *ApplicationRunContextListeners) Running(local *context.LocalStack, application *FrameApplicationContext) {
+func (a *ApplicationRunContextListeners) Running(local context.Context, applicationContext *ApplicationContext) {
 	for _, m := range a.ApplicationListeners {
-		m.Running(local, application)
+		m.Running(local, applicationContext)
 	}
 }
-func (a *ApplicationRunContextListeners) Failed(local *context.LocalStack, application *FrameApplicationContext, err interface{}) {
+func (a *ApplicationRunContextListeners) Failed(local context.Context, applicationContext *ApplicationContext, err interface{}) {
 	for _, m := range a.ApplicationListeners {
-		m.Failed(local, application, err)
+		m.Failed(local, applicationContext, err)
 	}
 }
 
-type DefaultApplicationArguments struct {
-	Args   []string
-	ArgMap map[string]string
+/**
+应用参数和环境变量
+*/
+type ApplicationArguments struct {
+	argMap   map[string]string
+	initLock sync.Once
 }
 
-func (d *DefaultApplicationArguments) Parse() {
+func (d *ApplicationArguments) init() {
+	d.initLock.Do(func() {
+		d.argMap = make(map[string]string)
+	})
+}
 
-	if d.ArgMap == nil {
-		d.ArgMap = make(map[string]string)
-	}
+func (d *ApplicationArguments) Parse(args []string) {
 
-	if len(d.Args) == 0 {
+	d.init()
+
+	if len(args) == 0 {
 		return
 	}
 
 	reg := regexp.MustCompile(`^\\-+`)
-	for _, arg := range d.Args {
+	for _, arg := range args {
 		arg1 := reg.ReplaceAllString(strings.TrimSpace(arg), "")
 		p := strings.Index(arg1, "=")
 		var k1 string
@@ -87,12 +101,12 @@ func (d *DefaultApplicationArguments) Parse() {
 			k1 = arg1[0:p]
 			v1 = arg1[p+1 : len(arg1)]
 		}
-		d.ArgMap[strings.TrimSpace(k1)] = strings.TrimSpace(v1)
+		d.argMap[strings.TrimSpace(k1)] = strings.TrimSpace(v1)
 	}
 }
 
-func (d *DefaultApplicationArguments) GetByName(key string, defaultValue string) string {
-	if m, ok := d.ArgMap[key]; ok {
+func (d *ApplicationArguments) GetByName(key string, defaultValue string) string {
+	if m, ok := d.argMap[key]; ok {
 		return m
 	}
 	envKey := strings.ToUpper(strings.ReplaceAll(key, ".", "_"))
@@ -103,72 +117,112 @@ func (d *DefaultApplicationArguments) GetByName(key string, defaultValue string)
 	return defaultValue
 }
 
-type ConfigurableEnvironment struct {
-	ConfigTree *YamlTree
-	AppArgs    *DefaultApplicationArguments
+/**
+应用配置
+*/
+type ApplicationConfig struct {
+	// 应用配置
+	configTree *YamlTree
+	// 环境变量和启动参数变量
+	appArgs  *ApplicationArguments
+	initLock sync.Once
 }
 
-func (y *ConfigurableEnvironment) GetTplFuncMap() template.FuncMap {
+func (a *ApplicationConfig) init() {
+	a.initLock.Do(func() {
+		a.configTree = &YamlTree{
+			AppArgs: a.appArgs,
+		}
+	})
+}
+
+//RefreshConfigTree 当merge tree之后刷新一下
+func (a *ApplicationConfig) RefreshConfigTree() {
+	a.configTree.ReIndex()
+}
+
+func (a *ApplicationConfig) SetAppArguments(appArgs *ApplicationArguments) *ApplicationConfig {
+	a.appArgs = appArgs
+	return a
+}
+
+func (a *ApplicationConfig) GetTplFuncMap() template.FuncMap {
 	return template.FuncMap{
 		"env": func(key string, defaultValue string) string {
-			return y.GetBaseValue(key, defaultValue)
+			return a.GetBaseValue(key, defaultValue)
 		},
 	}
 }
 
-func (y *ConfigurableEnvironment) ProxyTarget() *proxyclass.ProxyClass {
+func (a *ApplicationConfig) ProxyTarget() *proxyclass.ProxyClass {
 	return nil
 }
 
-func (y *ConfigurableEnvironment) Parse(content string) {
-	if y.ConfigTree.AppArgs == nil {
-		y.ConfigTree.AppArgs = y.AppArgs
-	}
-	y.ConfigTree.Parse(content)
+func (a *ApplicationConfig) Parse(content string) {
+	a.init()
+	a.configTree.Parse(content)
 }
 
-func (y *ConfigurableEnvironment) GetObjectValue(key string, target interface{}) {
-	y.ConfigTree.GetObjectValue(key, target)
+func (y *ApplicationConfig) GetObjectValue(key string, target interface{}) {
+	y.configTree.GetObjectValue(key, target)
 }
 
-func (y *ConfigurableEnvironment) GetBaseValue(key string, defaultValue string) string {
-	m := y.ConfigTree.GetBaseValue(key)
+func (y *ApplicationConfig) GetBaseValue(key string, defaultValue string) string {
+	m := y.configTree.GetBaseValue(key)
 	if m == "" {
 		return defaultValue
 	}
 	return m
 }
 
-// FrameLoadInstanceHandler 自定义实例加载模式
-type FrameLoadInstanceHandler interface {
+// LoadInstanceHandler 加载实例的时候
+/**
+第一轮 实例字段注入完成之后 检查实例是否需要特殊处理
+例如factory实例会生成其他实例
+*/
+type LoadInstanceHandler interface {
 
 	// LoadInstance 返回bool 自定义加载返回true 交给框架默认处理返回false
-	LoadInstance(local *context.LocalStack, target *DynamicProxyInstanceNode,
-		application *FrameApplication,
-		applicationContext *FrameApplicationContext) bool
+	LoadInstance(local context.Context, target *DynamicProxyInstanceNode,
+		application *Application,
+		applicationContext *ApplicationContext) bool
 
 	Order() int
 }
 
+/**
+双向链表 用来保存容器实例
+*/
 type DynamicProxyLinkedArray struct {
+	// 首节点
 	FirstElement *DynamicProxyInstanceNode
 
-	// id 对应 节点
+	// 实例pool id对应的实例
 	ElementMap map[string]*DynamicProxyInstanceNode
 
-	// 注入interface到时候
+	// 要注入的接口类型
 	interfaceInjectType []reflect.Type
 
+	// 最后一个节点
 	LastElement *DynamicProxyInstanceNode
+
+	initLock sync.Once
 }
 
 func (d *DynamicProxyLinkedArray) init() {
-	if d.ElementMap != nil {
-		return
-	}
-	d.ElementMap = make(map[string]*DynamicProxyInstanceNode)
+	d.initLock.Do(func() {
+		if d.ElementMap != nil {
+			return
+		}
+		d.ElementMap = make(map[string]*DynamicProxyInstanceNode)
+	})
 }
 
+/*
+AddHead
+往头部加入元素
+当一些节点解析优先级比较高的时候 在放入容器的时候就往后放
+*/
 func (d *DynamicProxyLinkedArray) AddHead(node *DynamicProxyInstanceNode) {
 	d.init()
 	if node.Target != nil {
@@ -215,10 +269,6 @@ func (d *DynamicProxyLinkedArray) AddHead(node *DynamicProxyInstanceNode) {
 		d.FirstElement = node
 	}
 
-	if d.ElementMap == nil {
-		d.ElementMap = make(map[string]*DynamicProxyInstanceNode)
-	}
-
 	d.ElementMap[node.Id] = node
 }
 
@@ -259,9 +309,6 @@ func (d *DynamicProxyLinkedArray) Push(node *DynamicProxyInstanceNode) {
 	if d.FirstElement == nil {
 		d.FirstElement = node
 	}
-	if d.ElementMap == nil {
-		d.ElementMap = make(map[string]*DynamicProxyInstanceNode)
-	}
 
 	d.ElementMap[node.Id] = node
 
@@ -271,11 +318,19 @@ func (d *DynamicProxyLinkedArray) Push(node *DynamicProxyInstanceNode) {
 	d.LastElement = node
 }
 
+/*
+DynamicProxyInstanceNode
+实例节点
+*/
 type DynamicProxyInstanceNode struct {
+
+	// 目标对象
 	Target proxyclass.ProxyTarger
 
+	// 下一个节点
 	Next *DynamicProxyInstanceNode
 
+	// 节点id
 	Id string
 
 	// Target 类型 push的时候设置  里面的值都是指针
@@ -284,17 +339,22 @@ type DynamicProxyInstanceNode struct {
 	// Target 反射值 push的时候设置 里面的值都是指针
 	rv reflect.Value
 
-	// push的时候设置
+	// 需要注入配置的字段 push的时候设置
 	configInjectField []*reflect.StructField
 
-	// push的时候设置
+	// 需要注入实例的字段 push的时候设置
 	instanceInject []*reflect.StructField
 }
 
+/*
+InsValueInjectTree
+需要注入的配置项，用于缓存
+例如两个地方a.b都注入同一个实例Aa那么两处使用同一个对象
+*/
 type InsValueInjectTree struct {
-	Root        *InsValueInjectTreeNode
-	RefNode     map[string]*InsValueInjectTreeNode
-	Environment *ConfigurableEnvironment
+	Root      *InsValueInjectTreeNode
+	RefNode   map[string]*InsValueInjectTreeNode
+	AppConfig *ApplicationConfig
 }
 
 func (i *InsValueInjectTree) SetTreeNode(key string,
@@ -430,22 +490,22 @@ func (i *InsValueInjectTree) SetBindValue(
 				//valvalrt := valrt.Elem()
 				valmaprt := reflect.MapOf(reflect.TypeOf(""), field.Type.Elem())
 				valmaprv := reflect.MakeMap(valmaprt)
-				i.Environment.GetObjectValue(configkey, valmaprv.Interface())
+				i.AppConfig.GetObjectValue(configkey, valmaprv.Interface())
 				objectVal = valmaprv.Interface()
 				val = &valmaprv
 			case reflect.Ptr:
 				v := reflect.New(field.Type.Elem())
-				i.Environment.GetObjectValue(configkey, v.Interface())
+				i.AppConfig.GetObjectValue(configkey, v.Interface())
 				objectVal = v.Interface()
 				val = &v
 			case reflect.Struct:
 				v := reflect.New(field.Type)
-				i.Environment.GetObjectValue(configkey, v.Interface())
+				i.AppConfig.GetObjectValue(configkey, v.Interface())
 				objectVal = v.Interface()
 				v1 := v.Elem()
 				val = &v1
 			default:
-				v1 := i.Environment.GetBaseValue(configkey, defaultVal)
+				v1 := i.AppConfig.GetBaseValue(configkey, defaultVal)
 				baseVal = v1
 				switch field.Type.Kind() {
 				case reflect.String:
@@ -531,4 +591,27 @@ type InsValueInjectTreeNode struct {
 	// 有哪些字段绑定了这个关键字 target和field是一一对应的
 	OwnerTarget []*DynamicProxyInstanceNode
 	OwnerField  []*reflect.StructField
+}
+
+type AppLoger interface {
+	Trace(local context.Context, format string, a ...interface{})
+
+	IsTraceEnable() bool
+
+	Debug(local context.Context, format string, a ...interface{})
+
+	IsDebugEnable() bool
+
+	Info(local context.Context, format string, a ...interface{})
+
+	IsInfoEnable() bool
+
+	Warn(local context.Context, format string, a ...interface{})
+
+	IsWarnEnable() bool
+
+	//err 可空
+	Error(local context.Context, err interface{}, format string, a ...interface{})
+
+	IsErrorEnable() bool
 }

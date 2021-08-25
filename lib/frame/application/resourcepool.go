@@ -98,6 +98,6 @@ func AddProxyInstance(name string, instance proxyclass.ProxyTarger) {
 func init() {
 	// 默认添加
 	resourcePool.RegisterInterfaceType(ApplicationContextListenerType)
-	resourcePool.RegisterInterfaceType(FrameLoadInstanceHandlerType)
-	resourcePool.RegisterInterfaceType(FrameLogFactoryerType)
+	resourcePool.RegisterInterfaceType(LoadInstanceHandlerType)
+	//resourcePool.RegisterInterfaceType(FrameLogFactoryerType)
 }
