@@ -37,8 +37,26 @@ func (c *classUtil) GetClassName(target interface{}) string {
 	return fmt.Sprintf("%s/%s", t.PkgPath(), t.Name())
 }
 
+//GetClassNameByType 接口，非指针到reflect.type类型
 func (c *classUtil) GetClassNameByType(t reflect.Type) string {
+	if t.Kind() == reflect.Ptr {
+		return fmt.Sprintf("%s/%s", t.Elem().PkgPath(), t.Elem().Name())
+	}
 	return fmt.Sprintf("%s/%s", t.PkgPath(), t.Name())
+}
+
+//GetSimpleClassName 用来获取struct的全路径 传递指针
+func (c *classUtil) GetSimpleClassName(target interface{}) string {
+	t := reflect.ValueOf(target).Elem().Type()
+	return StringUtil.FirstLower(t.Name())
+}
+
+//GetSimpleClassNameByType 接口，非指针到reflect.type类型
+func (c *classUtil) GetSimpleClassNameByType(t reflect.Type) string {
+	if t.Kind() == reflect.Ptr {
+		return StringUtil.FirstLower(t.Elem().Name())
+	}
+	return StringUtil.FirstLower(t.Name())
 }
 
 func (c *classUtil) GetJavaClassNameByType(t reflect.Type) string {

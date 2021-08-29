@@ -109,9 +109,10 @@ func (a *Application) CreateApplicationContext(local context.Context, appConfig 
 			AppConfig: appConfig,
 			RefNode:   make(map[string]*InsValueInjectTreeNode),
 		},
-		AdapterMap:       make(map[string]map[string]*DynamicProxyInstanceNode),
-		FrameResource:    a.FrameResource,
-		FrameHttpStarter: a.FrameHttpStarter,
+		FrameHttpStarter:     a.FrameHttpStarter,
+		ElementMap:           make(map[string]*DynamicProxyInstanceNode),
+		ElementTypeNameMap:   make(map[string]*DynamicProxyInstanceNode),
+		InterfaceTypeNameMap: make(map[string][]*DynamicProxyInstanceNode),
 	}
 	return applicationContext
 }
@@ -120,8 +121,7 @@ func (a *Application) CreateApplicationContext(local context.Context, appConfig 
 func (a *Application) RefreshContext(local context.Context, applicationContext *ApplicationContext) {
 
 	// 容器中所有实例 采用的是链表
-	pl := applicationContext.FrameResource.ProxyInsPool
-
+	insPool := a.FrameResource.ProxyInsPool
 	// 实例加载器
 	if len(a.LoadStrategy) > 1 {
 		sort.Slice(a.LoadStrategy, func(i, j int) bool {
@@ -129,29 +129,18 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 		})
 	}
 
-	current := pl.FirstElement
+	current := insPool.FirstElement
 
 	// 第一轮注入的时候 找不到对象 可能是factoryer还没生成 放到第二轮注入 暂时只支持2轮
 	firstNilInject := make([]*DynamicProxyInstanceNode, 0, 30)
 
-	// 接口对应的实现类 接口类名-->实现
-	var interfaceMap map[string]*DynamicProxyInstanceNode = make(map[string]*DynamicProxyInstanceNode)
-
 	for current != nil {
 
-		for _, interType := range pl.interfaceInjectType {
+		// 放入到应用上下文中
+		applicationContext.addInstance(current)
+		for _, interType := range insPool.InterfaceTypeNameMap {
 			if current.rt.Implements(interType) {
-				key := util.ClassUtil.GetClassNameByType(interType)
-				if m1, ok := interfaceMap[key]; ok {
-					if m1 == current {
-						continue
-					}
-					panic(fmt.Errorf("%s 接口的实现有多个 %s %s 不能直接注入", key,
-						util.ClassUtil.GetClassNameByType(m1.rt.Elem()),
-						util.ClassUtil.GetClassNameByType(current.rt.Elem())))
-				} else {
-					interfaceMap[key] = current
-				}
+				applicationContext.addInterfaceImpl(interType, current)
 			}
 		}
 

@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"github.com/dxq174510447/goframe/lib/frame/util"
 	"os"
@@ -197,11 +198,14 @@ type DynamicProxyLinkedArray struct {
 	// 首节点
 	FirstElement *DynamicProxyInstanceNode
 
-	// 实例pool id对应的实例
+	// 实例pool id对应的实例 util.ClassUtil.GetSimpleClassName
 	ElementMap map[string]*DynamicProxyInstanceNode
 
-	// 要注入的接口类型
-	interfaceInjectType []reflect.Type
+	// Element类型名 对应的类型 util.ClassUtil.GetClassName
+	ElementTypeNameMap map[string]*DynamicProxyInstanceNode
+
+	// 要注入的接口类型 util.ClassUtil.GetClassName
+	InterfaceTypeNameMap map[string]reflect.Type
 
 	// 最后一个节点
 	LastElement *DynamicProxyInstanceNode
@@ -211,11 +215,26 @@ type DynamicProxyLinkedArray struct {
 
 func (d *DynamicProxyLinkedArray) init() {
 	d.initLock.Do(func() {
-		if d.ElementMap != nil {
-			return
+		if d.ElementMap == nil {
+			d.ElementMap = make(map[string]*DynamicProxyInstanceNode)
 		}
-		d.ElementMap = make(map[string]*DynamicProxyInstanceNode)
+		if d.ElementTypeNameMap == nil {
+			d.ElementTypeNameMap = make(map[string]*DynamicProxyInstanceNode)
+		}
+		if d.InterfaceTypeNameMap == nil {
+			d.InterfaceTypeNameMap = make(map[string]reflect.Type)
+		}
 	})
+}
+
+// 这里只接收interface类型
+func (d *DynamicProxyLinkedArray) AddInterfacer(t reflect.Type) {
+	d.init()
+	if t.Kind() != reflect.Interface {
+		err := fmt.Errorf("%s is not interface type", t.Name())
+		panic(err)
+	}
+	d.InterfaceTypeNameMap[util.ClassUtil.GetClassNameByType(t)] = t
 }
 
 /*
@@ -225,6 +244,12 @@ AddHead
 */
 func (d *DynamicProxyLinkedArray) AddHead(node *DynamicProxyInstanceNode) {
 	d.init()
+
+	if _, ok := d.ElementMap[node.Id]; ok {
+		err := fmt.Errorf("%s already add，please rename it", node.Id)
+		panic(err)
+	}
+
 	if node.Target != nil {
 		target := node.Target
 		node.rt = reflect.TypeOf(target)
@@ -236,17 +261,7 @@ func (d *DynamicProxyLinkedArray) AddHead(node *DynamicProxyInstanceNode) {
 				if _, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
 					node.instanceInject = append(node.instanceInject, &field)
 					if field.Type.Kind() == reflect.Interface {
-						add := false
-						// 数据量小的时候 比hash快
-						for _, ft := range d.interfaceInjectType {
-							if ft == field.Type {
-								add = true
-								break
-							}
-						}
-						if !add {
-							d.interfaceInjectType = append(d.interfaceInjectType, field.Type)
-						}
+						d.AddInterfacer(field.Type)
 					}
 				}
 
@@ -274,6 +289,12 @@ func (d *DynamicProxyLinkedArray) AddHead(node *DynamicProxyInstanceNode) {
 
 func (d *DynamicProxyLinkedArray) Push(node *DynamicProxyInstanceNode) {
 	d.init()
+
+	if _, ok := d.ElementMap[node.Id]; ok {
+		err := fmt.Errorf("%s already add，please rename it", node.Id)
+		panic(err)
+	}
+
 	if node.Target != nil {
 		target := node.Target
 		node.rv = reflect.ValueOf(target)
@@ -285,17 +306,7 @@ func (d *DynamicProxyLinkedArray) Push(node *DynamicProxyInstanceNode) {
 				if _, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
 					node.instanceInject = append(node.instanceInject, &field)
 					if field.Type.Kind() == reflect.Interface {
-						add := false
-						// 数据量小的时候 比hash快
-						for _, ft := range d.interfaceInjectType {
-							if ft == field.Type {
-								add = true
-								break
-							}
-						}
-						if !add {
-							d.interfaceInjectType = append(d.interfaceInjectType, field.Type)
-						}
+						d.AddInterfacer(field.Type)
 					}
 				}
 
@@ -324,13 +335,13 @@ DynamicProxyInstanceNode
 */
 type DynamicProxyInstanceNode struct {
 
-	// 目标对象
-	Target proxyclass.ProxyTarger
+	// 目标对象 指针
+	Target interface{}
 
 	// 下一个节点
 	Next *DynamicProxyInstanceNode
 
-	// 节点id
+	// 节点id 如果不指定到话  see util.ClassUtil.GetSimpleClassName
 	Id string
 
 	// Target 类型 push的时候设置  里面的值都是指针
