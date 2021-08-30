@@ -28,11 +28,3 @@ var ApplicationContextListenerTypeName string = util.ClassUtil.GetClassNameByTyp
 
 var LoadInstanceHandlerType reflect.Type = reflect.Zero(reflect.TypeOf((*LoadInstanceHandler)(nil)).Elem()).Type()
 var LoadInstanceHandlerTypeName string = util.ClassUtil.GetClassNameByType(LoadInstanceHandlerType)
-
-var AppLogerType reflect.Type = reflect.Zero(reflect.TypeOf((*AppLoger)(nil)).Elem()).Type()
-var AppLogerTypeName string = util.ClassUtil.GetClassNameByType(AppLogerType)
-
-//var FrameLogFactoryerType reflect.Type = reflect.Zero(reflect.TypeOf((*logclass.AppLogFactoryer)(nil)).Elem()).Type()
-//var FrameLogFactoryerTypeName string = util.ClassUtil.GetClassNameByType(FrameLogFactoryerType)
-//
-//var FrameLogLoggerType reflect.Type = reflect.Zero(reflect.TypeOf((*logclass.AppLoger)(nil)).Elem()).Type()

@@ -24,6 +24,8 @@ type ApplicationContext struct {
 	// Element类型名 对应的类型 util.ClassUtil.GetClassName
 	// key可能是接口全名 也可能是 struct全名
 	ElementTypeNameMap map[string][]*DynamicProxyInstanceNode
+
+	logger AppLoger
 }
 
 func (a *ApplicationContext) addInstance(target *DynamicProxyInstanceNode) {

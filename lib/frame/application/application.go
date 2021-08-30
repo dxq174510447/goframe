@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/ctx"
-	"github.com/dxq174510447/goframe/lib/frame/proxy/core"
 	"github.com/dxq174510447/goframe/lib/frame/util"
 	"reflect"
 	"sort"
@@ -26,6 +25,8 @@ type Application struct {
 
 	// 自定义http启动器
 	FrameHttpStarter HttpStarter
+
+	logger AppLoger
 }
 
 func (a *Application) AddApplicationContextListener(listener ApplicationContextListener) *Application {
@@ -91,6 +92,7 @@ func (a *Application) PrepareEnvironment(local context.Context,
 	appArgs *ApplicationArguments) *ApplicationConfig {
 
 	appConfig := (&ApplicationConfig{}).SetAppArguments(appArgs)
+	appConfig.logger = GetResourcePool().ProxyInsPool.LogFactory.GetLoggerType(reflect.TypeOf(appConfig))
 
 	// 记载启动配置文件
 	a.ConfigureEnvironment(local, appConfig, appArgs)
@@ -109,11 +111,11 @@ func (a *Application) CreateApplicationContext(local context.Context, appConfig 
 			AppConfig: appConfig,
 			RefNode:   make(map[string]*InsValueInjectTreeNode),
 		},
-		FrameHttpStarter:     a.FrameHttpStarter,
-		ElementMap:           make(map[string]*DynamicProxyInstanceNode),
-		ElementTypeNameMap:   make(map[string]*DynamicProxyInstanceNode),
-		InterfaceTypeNameMap: make(map[string][]*DynamicProxyInstanceNode),
+		FrameHttpStarter:   a.FrameHttpStarter,
+		ElementMap:         make(map[string]*DynamicProxyInstanceNode),
+		ElementTypeNameMap: make(map[string][]*DynamicProxyInstanceNode),
 	}
+	applicationContext.logger = GetResourcePool().ProxyInsPool.LogFactory.GetLoggerType(reflect.TypeOf(applicationContext))
 	return applicationContext
 }
 
@@ -149,13 +151,13 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 			// 类型注入
 			for _, field := range current.instanceInject {
 
-				if field.Type == AppLogerType {
-					//if a.LogFactory != nil {
-					//	logger := a.LogFactory.GetLoggerType(current.rt.Elem())
-					//	reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(logger))
-					//}
-					continue
-				}
+				//if field.Type == AppLogerType {
+				//	//if a.LogFactory != nil {
+				//	//	logger := a.LogFactory.GetLoggerType(current.rt.Elem())
+				//	//	reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(logger))
+				//	//}
+				//	continue
+				//}
 
 				// 安类型 或者id注入
 				if key, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
@@ -163,7 +165,7 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 					var inject bool = false
 					if key != "" {
 						// 指定id注入
-						if ele, ok1 := pl.ElementMap[key]; ok1 {
+						if ele, ok1 := insPool.ElementMap[key]; ok1 {
 							if ele.Target != nil {
 								//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", current.Id, field.Name, ele.Id)
 								reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
@@ -174,8 +176,8 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 
 						if field.Type.Kind() == reflect.Interface {
 							// 根据接口类型注入
-							name := util.ClassUtil.GetClassNameByType(field.Type)
-							if ele, ok1 := interfaceMap[name]; ok1 {
+							ele := applicationContext.getByInterfaceType(field.Type)
+							if ele != nil {
 								if ele.Target != nil {
 									//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", current.Id, field.Name, ele.Id)
 									reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
@@ -184,8 +186,8 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 							}
 						} else {
 							//指针注入
-							name := util.ClassUtil.GetClassNameByType(field.Type.Elem())
-							if ele, ok1 := pl.ElementMap[name]; ok1 {
+							name := util.ClassUtil.GetSimpleClassNameByType(field.Type.Elem())
+							if ele, ok1 := insPool.ElementMap[name]; ok1 {
 								if ele.Target != nil {
 									//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", current.Id, field.Name, ele.Id)
 									reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
@@ -241,21 +243,8 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 				}
 			}
 		}
-		if !add {
-			core.AddClassProxy(current.Target)
-		}
-
-		//if f, ok := current.Target.(ProxyInstanceAdapter); ok {
-		//	adapterKey := f.AdapterKey()
-		//	if len(adapterKey) == 0 {
-		//		continue
-		//	}
-		//	groupName := adapterKey[0]
-		//	groupKey := current.Id
-		//	if len(adapterKey) > 1 {
-		//		groupKey = adapterKey[1]
-		//	}
-		//	applicationContext.SetProxyInsByAdapter(groupName, groupKey, current)
+		//if !add {
+		//	core.AddClassProxy(current.Target)
 		//}
 
 		current = current.Next
@@ -271,9 +260,9 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 		for _, field := range ele1.instanceInject {
 
 			// 特殊类型 日志类型注入 第一轮已经注入
-			if field.Type == AppLogerType {
-				continue
-			}
+			//if field.Type == AppLogerType {
+			//	continue
+			//}
 
 			if key, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
 
@@ -285,7 +274,7 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 
 				var inject bool = false
 				if key != "" {
-					if ele, ok1 := pl.ElementMap[key]; ok1 {
+					if ele, ok1 := insPool.ElementMap[key]; ok1 {
 						if ele.Target != nil {
 							//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", ele1.Id, field.Name, ele.Id)
 							reflect.ValueOf(ele1.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
@@ -294,18 +283,16 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 					}
 				} else {
 					if field.Type.Kind() == reflect.Interface {
-						name := util.ClassUtil.GetClassNameByType(field.Type)
-						if ele, ok1 := interfaceMap[name]; ok1 {
-							if ele.Target != nil {
-								//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", ele1.Id, field.Name, ele.Id)
-								reflect.ValueOf(ele1.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
-								inject = true
-							}
+						ele := applicationContext.getByInterfaceType(field.Type)
+						if ele != nil && ele.Target != nil {
+							//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", ele1.Id, field.Name, ele.Id)
+							reflect.ValueOf(ele1.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
+							inject = true
 						}
 					} else {
 						//指针注入
-						name := util.ClassUtil.GetClassNameByType(field.Type.Elem())
-						if ele, ok1 := pl.ElementMap[name]; ok1 {
+						name := util.ClassUtil.GetSimpleClassNameByType(field.Type.Elem())
+						if ele, ok1 := insPool.ElementMap[name]; ok1 {
 							if ele.Target != nil {
 								//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", ele1.Id, field.Name, ele.Id)
 								reflect.ValueOf(ele1.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
@@ -320,7 +307,6 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 						util.ClassUtil.GetClassNameByType(ele1.rt.Elem()),
 						field.Name))
 				}
-
 			}
 		}
 	}
@@ -400,25 +386,18 @@ func NewApplication(main interface{}) *Application {
 
 	// 应用启动监听器
 	listeners := make([]ApplicationContextListener, 0, 0)
-	if arr, ok := GetResourcePool().RegisterInsMap[ApplicationContextListenerTypeName]; ok {
+	if arr, ok := GetResourcePool().ProxyInsPool.SysInterfaceImplNameMap[ApplicationContextListenerTypeName]; ok {
 		for _, a := range arr {
 			listeners = append(listeners, a.Target.(ApplicationContextListener))
 		}
 	}
 
 	instanceLoad := make([]LoadInstanceHandler, 0, 0)
-	if arr, ok := GetResourcePool().RegisterInsMap[LoadInstanceHandlerTypeName]; ok {
+	if arr, ok := GetResourcePool().ProxyInsPool.SysInterfaceImplNameMap[LoadInstanceHandlerTypeName]; ok {
 		for _, a := range arr {
 			instanceLoad = append(instanceLoad, a.Target.(LoadInstanceHandler))
 		}
 	}
-
-	//var logFactory logclass.AppLogFactoryer
-	//if arr, ok := GetResourcePool().RegisterInsMap[FrameLogFactoryerTypeName]; ok {
-	//	if len(arr) > 0 {
-	//		logFactory = arr[0].Target.(logclass.AppLogFactoryer)
-	//	}
-	//}
 
 	app := &Application{
 		MainClass:            main,
@@ -426,5 +405,6 @@ func NewApplication(main interface{}) *Application {
 		LoadStrategy:         instanceLoad,
 		FrameResource:        GetResourcePool(),
 	}
+	app.logger = GetResourcePool().ProxyInsPool.LogFactory.GetLoggerType(reflect.TypeOf(app))
 	return app
 }

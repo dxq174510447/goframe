@@ -3,7 +3,6 @@ package application
 import (
 	"context"
 	"fmt"
-	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"github.com/dxq174510447/goframe/lib/frame/util"
 	"os"
 	"reflect"
@@ -127,6 +126,7 @@ type ApplicationConfig struct {
 	// 环境变量和启动参数变量
 	appArgs  *ApplicationArguments
 	initLock sync.Once
+	logger   AppLoger
 }
 
 func (a *ApplicationConfig) init() {
@@ -153,10 +153,6 @@ func (a *ApplicationConfig) GetTplFuncMap() template.FuncMap {
 			return a.GetBaseValue(key, defaultValue)
 		},
 	}
-}
-
-func (a *ApplicationConfig) ProxyTarget() *proxyclass.ProxyClass {
-	return nil
 }
 
 func (a *ApplicationConfig) Parse(content string) {
@@ -207,6 +203,13 @@ type DynamicProxyLinkedArray struct {
 	// 要注入的接口类型 util.ClassUtil.GetClassName
 	InterfaceTypeNameMap map[string]reflect.Type
 
+	// 平台的接口 util.ClassUtil.GetClassName
+	SysInterfaceTypeNameMap map[string]reflect.Type
+	// 注入实例的时候检查实例是否属于平台接口
+	SysInterfaceImplNameMap map[string][]*DynamicProxyInstanceNode
+
+	LogFactory AppLogFactoryer
+
 	// 最后一个节点
 	LastElement *DynamicProxyInstanceNode
 
@@ -224,17 +227,13 @@ func (d *DynamicProxyLinkedArray) init() {
 		if d.InterfaceTypeNameMap == nil {
 			d.InterfaceTypeNameMap = make(map[string]reflect.Type)
 		}
+		if d.SysInterfaceTypeNameMap == nil {
+			d.SysInterfaceTypeNameMap = make(map[string]reflect.Type)
+		}
+		if d.SysInterfaceImplNameMap == nil {
+			d.SysInterfaceImplNameMap = make(map[string][]*DynamicProxyInstanceNode)
+		}
 	})
-}
-
-// 这里只接收interface类型
-func (d *DynamicProxyLinkedArray) AddInterfacer(t reflect.Type) {
-	d.init()
-	if t.Kind() != reflect.Interface {
-		err := fmt.Errorf("%s is not interface type", t.Name())
-		panic(err)
-	}
-	d.InterfaceTypeNameMap[util.ClassUtil.GetClassNameByType(t)] = t
 }
 
 /*
@@ -327,6 +326,27 @@ func (d *DynamicProxyLinkedArray) Push(node *DynamicProxyInstanceNode) {
 		d.LastElement.Next = node
 	}
 	d.LastElement = node
+}
+
+// 这里只接收interface类型
+func (d *DynamicProxyLinkedArray) AddInterfacer(t reflect.Type) {
+	d.init()
+	if t.Kind() != reflect.Interface {
+		err := fmt.Errorf("%s is not interface type", t.Name())
+		panic(err)
+	}
+	d.InterfaceTypeNameMap[util.ClassUtil.GetClassNameByType(t)] = t
+}
+
+func (d *DynamicProxyLinkedArray) AddSysInterfacer(t reflect.Type) {
+	d.init()
+	if t.Kind() != reflect.Interface {
+		err := fmt.Errorf("%s is not interface type", t.Name())
+		panic(err)
+	}
+	name := util.ClassUtil.GetClassNameByType(t)
+	d.InterfaceTypeNameMap[name] = t
+	d.SysInterfaceTypeNameMap[name] = t
 }
 
 /*
@@ -602,6 +622,12 @@ type InsValueInjectTreeNode struct {
 	// 有哪些字段绑定了这个关键字 target和field是一一对应的
 	OwnerTarget []*DynamicProxyInstanceNode
 	OwnerField  []*reflect.StructField
+}
+
+type AppLogFactoryer interface {
+	GetLoggerType(p reflect.Type) AppLoger
+
+	GetLoggerString(className string) AppLoger
 }
 
 type AppLoger interface {
