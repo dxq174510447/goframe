@@ -1,9 +1,8 @@
-package logcore
+package log
 
 import (
 	"bufio"
-	"github.com/dxq174510447/goframe/lib/frame/context"
-	"github.com/dxq174510447/goframe/lib/frame/log/logclass"
+	"context"
 	"github.com/dxq174510447/goframe/lib/frame/util"
 	"io"
 	"os"
@@ -11,7 +10,7 @@ import (
 )
 
 type RollingFileAppenderImpl struct {
-	Property   *logclass.AppenderProperty
+	Property   *AppenderProperty
 	Target     io.Writer
 	FilePath   string
 	FileTarget *os.File
@@ -20,16 +19,18 @@ type RollingFileAppenderImpl struct {
 	TimePattern     string
 	FileNamePattern string
 	RollingRule     string
+	BaseAppender
 }
 
-func (r *RollingFileAppenderImpl) AppendRow(local *context.LocalStack, level string, config *logclass.LoggerConfig, row string, err interface{}) {
-	if IsAppendRow(local, level, config, r.Property) {
+func (r *RollingFileAppenderImpl) AppendRow(local context.Context, level string,
+	config *LoggerConfig, row string, err interface{}) {
+	if r.BaseAppender.IsAppendRow(local, level, config, r.Property) {
 		r.Property.Layout.DoLayout(local, level, config, row, err)
 		r.FileBuffer.Flush()
 	}
 }
 
-func (r *RollingFileAppenderImpl) NewAppender(ele *logclass.LogAppenderXmlEle) logclass.LogAppender {
+func (r *RollingFileAppenderImpl) NewAppender(ele *LogAppenderXmlEle) LogAppender {
 
 	namePattern := ele.RollingPolicy.FileNamePattern
 	timePattern := GetTimePatternFromFileNamePattern(namePattern)
@@ -63,12 +64,12 @@ func (r *RollingFileAppenderImpl) NewAppender(ele *logclass.LogAppenderXmlEle) l
 		FileNamePattern: namePattern,
 		RollingRule:     rollingRule,
 	}
-	SetAppender(ele, bufferWriter, result)
-	return logclass.LogAppender(result)
+	r.BaseAppender.SetAppender(ele, bufferWriter, result)
+	return LogAppender(result)
 
 }
 
-func (r *RollingFileAppenderImpl) SetAppenderProperty(property *logclass.AppenderProperty) {
+func (r *RollingFileAppenderImpl) SetAppenderProperty(property *AppenderProperty) {
 	r.Property = property
 }
 

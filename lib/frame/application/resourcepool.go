@@ -35,20 +35,13 @@ func (r *ResourcePool) AddConfigYaml(name string, config string) {
 	resourcePool.ConfigMap[name] = config
 }
 
-// AddAppLogConfig 初始化添加全局配置文件内容
-//  name 配置关键字 ，例如 ApplicationDefaultYaml
-// 加载规则，默认加载default,然后从启动项或者环境变量中获取spring.profiles.active，如果获取到就加载，获取不到就加载local
-//func (r *ResourcePool) AddAppLogConfig(name string, config string) {
-//	resourcePool.LogConfigMap[name] = config
-//}
-
 func (r *ResourcePool) RegisterLogFactory(logfactory AppLogFactoryer) {
 	resourcePool.ProxyInsPool.LogFactory = logfactory
 }
 
 // AddInstance name 可以为空 ，默认会设置类名 将实例放到容器中
 // instance 必须是指针
-func (r *ResourcePool) AddInstance(name string, instance interface{}) {
+func (r *ResourcePool) RegisterInstance(name string, instance interface{}) {
 
 	if reflect.TypeOf(instance).Kind() != reflect.Ptr {
 		err := fmt.Errorf("%s is not ptr", name)
@@ -92,8 +85,7 @@ func (r *ResourcePool) AddInstance(name string, instance interface{}) {
 }
 
 var resourcePool ResourcePool = ResourcePool{
-	ConfigMap: make(map[string]string),
-	//LogConfigMap: make(map[string]string),
+	ConfigMap:    make(map[string]string),
 	ProxyInsPool: &DynamicProxyLinkedArray{},
 }
 
@@ -105,5 +97,4 @@ func init() {
 	// 默认添加
 	resourcePool.RegisterSysInterfaceType(ApplicationContextListenerType)
 	resourcePool.RegisterSysInterfaceType(LoadInstanceHandlerType)
-	//resourcePool.RegisterInterfaceType(FrameLogFactoryerType)
 }

@@ -55,7 +55,7 @@ func (a *Application) Run(args []string) *ApplicationContext {
 	}()
 
 	// 启动参数
-	appArg := &ApplicationArguments{}
+	appArg := NewApplicationArguments()
 	// 解析启动参数
 	appArg.Parse(args)
 
@@ -91,8 +91,7 @@ func (a *Application) PrepareEnvironment(local context.Context,
 	listeners *ApplicationRunContextListeners,
 	appArgs *ApplicationArguments) *ApplicationConfig {
 
-	appConfig := (&ApplicationConfig{}).SetAppArguments(appArgs)
-	appConfig.logger = GetResourcePool().ProxyInsPool.LogFactory.GetLoggerType(reflect.TypeOf(appConfig))
+	appConfig := NewApplicationConfig(appArgs)
 
 	// 记载启动配置文件
 	a.ConfigureEnvironment(local, appConfig, appArgs)
@@ -105,17 +104,7 @@ func (a *Application) PrepareEnvironment(local context.Context,
 }
 
 func (a *Application) CreateApplicationContext(local context.Context, appConfig *ApplicationConfig) *ApplicationContext {
-	applicationContext := &ApplicationContext{
-		AppConfig: appConfig,
-		ValueBindTree: &InsValueInjectTree{
-			AppConfig: appConfig,
-			RefNode:   make(map[string]*InsValueInjectTreeNode),
-		},
-		FrameHttpStarter:   a.FrameHttpStarter,
-		ElementMap:         make(map[string]*DynamicProxyInstanceNode),
-		ElementTypeNameMap: make(map[string][]*DynamicProxyInstanceNode),
-	}
-	applicationContext.logger = GetResourcePool().ProxyInsPool.LogFactory.GetLoggerType(reflect.TypeOf(applicationContext))
+	applicationContext := NewApplicationContext(appConfig, a)
 	return applicationContext
 }
 
@@ -151,13 +140,11 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 			// 类型注入
 			for _, field := range current.instanceInject {
 
-				//if field.Type == AppLogerType {
-				//	//if a.LogFactory != nil {
-				//	//	logger := a.LogFactory.GetLoggerType(current.rt.Elem())
-				//	//	reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(logger))
-				//	//}
-				//	continue
-				//}
+				if field.Type == AppLogerType {
+					logger := GetResourcePool().ProxyInsPool.LogFactory.GetLoggerType(current.rt)
+					reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(logger))
+					continue
+				}
 
 				// 安类型 或者id注入
 				if key, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
@@ -260,9 +247,9 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 		for _, field := range ele1.instanceInject {
 
 			// 特殊类型 日志类型注入 第一轮已经注入
-			//if field.Type == AppLogerType {
-			//	continue
-			//}
+			if field.Type == AppLogerType {
+				continue
+			}
 
 			if key, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
 
@@ -352,35 +339,6 @@ func (a *Application) ConfigureEnvironment(local context.Context,
 	}
 
 }
-
-//func (a *FrameApplication) PrepareLogFactory(local *context.LocalStack) {
-//	if a.LogFactory == nil {
-//		return
-//	}
-//
-//	// 加载系统默认配置文件
-//	files := make([]string, 0, 0)
-//	files = append(files, ApplicationDefaultYaml)
-//	activeFile := a.Environment.GetBaseValue("spring.profiles.active", "")
-//	if activeFile != "" {
-//		fs := strings.Split(activeFile, ",")
-//		files = append(files, fs...)
-//	} else {
-//		files = append(files, ApplicationLocalYaml)
-//	}
-//
-//	funcMap := a.Environment.GetTplFuncMap()
-//	for _, f := range files {
-//		if c, ok := GetResourcePool().LogConfigMap[f]; ok {
-//			a.LogFactory.Parse(c, funcMap)
-//			a.logs = append(a.logs, fmt.Sprintf("[初始化] 日志配置 %s 解析并加载", f))
-//		} else {
-//			a.logs = append(a.logs, fmt.Sprintf("[初始化] 日志配置 %s 找不到对应配置文件", f))
-//		}
-//	}
-//
-//	a.logs = append(a.logs, fmt.Sprintf("[初始化] 日志配置 加载完成"))
-//}
 
 func NewApplication(main interface{}) *Application {
 

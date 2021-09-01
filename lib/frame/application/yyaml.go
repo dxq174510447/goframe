@@ -35,6 +35,7 @@ type YamlTree struct {
 	Root    *YamlNode
 	RefNode map[string]*YamlNode
 	AppArgs *ApplicationArguments
+	logger  AppLoger
 }
 
 func (y *YamlTree) innerPrintTree(node *YamlNode, depth int) {
@@ -820,4 +821,12 @@ var reg1 *regexp.Regexp = regexp.MustCompile(`\W+`)
 
 func removeSpecialChar(m string) string {
 	return reg1.ReplaceAllString(m, "")
+}
+
+func NewYamlTree(appArgs *ApplicationArguments) *YamlTree {
+	y := &YamlTree{
+		AppArgs: appArgs,
+	}
+	y.logger = GetResourcePool().ProxyInsPool.LogFactory.GetLoggerType(reflect.TypeOf(y))
+	return y
 }

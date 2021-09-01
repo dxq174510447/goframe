@@ -90,3 +90,18 @@ func (a *ApplicationContext) getByInterfaceType(ier reflect.Type) *DynamicProxyI
 //		return result.Target
 //	}
 //}
+
+func NewApplicationContext(appConfig *ApplicationConfig, application *Application) *ApplicationContext {
+	applicationContext := &ApplicationContext{
+		AppConfig: appConfig,
+		ValueBindTree: &InsValueInjectTree{
+			AppConfig: appConfig,
+			RefNode:   make(map[string]*InsValueInjectTreeNode),
+		},
+		FrameHttpStarter:   application.FrameHttpStarter,
+		ElementMap:         make(map[string]*DynamicProxyInstanceNode),
+		ElementTypeNameMap: make(map[string][]*DynamicProxyInstanceNode),
+	}
+	applicationContext.logger = GetResourcePool().ProxyInsPool.LogFactory.GetLoggerType(reflect.TypeOf(applicationContext))
+	return applicationContext
+}

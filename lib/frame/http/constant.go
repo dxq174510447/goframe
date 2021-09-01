@@ -2,8 +2,9 @@ package http
 
 import (
 	"bytes"
+	"context"
 	"fmt"
-	"github.com/dxq174510447/goframe/lib/frame/context"
+	"github.com/dxq174510447/goframe/lib/frame/ctx"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"net/http"
 	"runtime"
@@ -25,36 +26,36 @@ const (
 	CurrentHttpResponse = "CurrentHttpResponse_"
 )
 
-func SetCurrentControllerInvoker(local *context.LocalStack, invoker1 *ControllerVar) {
-	local.Set(CurrentControllerInvoker, invoker1)
+func SetCurrentControllerInvoker(local context.Context, invoker1 *ControllerVar) {
+	ctx.WithValue(local, CurrentControllerInvoker, invoker1)
 }
-func GetCurrentControllerInvoker(local *context.LocalStack) *ControllerVar {
-	invoker := local.Get(CurrentControllerInvoker)
+func GetCurrentControllerInvoker(local context.Context) *ControllerVar {
+	invoker := local.Value(CurrentControllerInvoker)
 	return invoker.(*ControllerVar)
 }
 
-func SetCurrentHttpRequest(local *context.LocalStack, request *http.Request) {
-	local.Set(CurrentHttpRequest, request)
+func SetCurrentHttpRequest(local context.Context, request *http.Request) {
+	ctx.WithValue(local, CurrentHttpRequest, request)
 }
-func GetCurrentHttpRequest(local *context.LocalStack) *http.Request {
-	invoker := local.Get(CurrentHttpRequest)
+func GetCurrentHttpRequest(local context.Context) *http.Request {
+	invoker := local.Value(CurrentHttpRequest)
 	return invoker.(*http.Request)
 }
 
-func SetCurrentHttpResponse(local *context.LocalStack, response http.ResponseWriter) {
-	local.Set(CurrentHttpResponse, response)
+func SetCurrentHttpResponse(local context.Context, response http.ResponseWriter) {
+	ctx.WithValue(local, CurrentHttpResponse, response)
 }
-func GetCurrentHttpResponse(local *context.LocalStack) http.ResponseWriter {
-	invoker := local.Get(CurrentHttpResponse)
+func GetCurrentHttpResponse(local context.Context) http.ResponseWriter {
+	invoker := local.Value(CurrentHttpResponse)
 	return invoker.(http.ResponseWriter)
 }
 
-func SetCurrentFilterIndex(local *context.LocalStack, index int) {
-	local.Set(FilterIndexWaitToExecute, index)
+func SetCurrentFilterIndex(local context.Context, index int) {
+	ctx.WithValue(local, FilterIndexWaitToExecute, index)
 }
 
-func GetCurrentFilterIndex(local *context.LocalStack) int {
-	index := local.Get(FilterIndexWaitToExecute)
+func GetCurrentFilterIndex(local context.Context) int {
+	index := local.Value(FilterIndexWaitToExecute)
 	if index == nil {
 		return 0
 	}

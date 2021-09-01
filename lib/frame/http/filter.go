@@ -1,19 +1,17 @@
 package http
 
 import (
-	"github.com/dxq174510447/goframe/lib/frame/context"
-	"github.com/dxq174510447/goframe/lib/frame/proxy/core"
-	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
+	"context"
 	"net/http"
 	"sort"
 )
 
 type FilterChain interface {
-	DoFilter(local *context.LocalStack, request *http.Request, response http.ResponseWriter)
+	DoFilter(local context.Context, request *http.Request, response http.ResponseWriter)
 }
 
 type Filter interface {
-	DoFilter(local *context.LocalStack, request *http.Request, response http.ResponseWriter, chain FilterChain)
+	DoFilter(local context.Context, request *http.Request, response http.ResponseWriter, chain FilterChain)
 
 	Order() int
 }
@@ -22,7 +20,7 @@ type DefaultFilterChain struct {
 	filters []Filter
 }
 
-func (d *DefaultFilterChain) DoFilter(local *context.LocalStack,
+func (d *DefaultFilterChain) DoFilter(local context.Context,
 	request *http.Request,
 	response http.ResponseWriter) {
 
@@ -44,9 +42,6 @@ func GetDefaultFilterChain() *DefaultFilterChain {
 }
 
 func AddFilter(filter Filter) {
-
-	core.AddClassProxy(filter.(proxyclass.ProxyTarger))
-
 	d := append(defaultFilterChain.filters, filter)
 	if len(d) > 1 {
 		sort.Slice(d, func(i, j int) bool {

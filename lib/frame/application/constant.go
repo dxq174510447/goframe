@@ -28,3 +28,6 @@ var ApplicationContextListenerTypeName string = util.ClassUtil.GetClassNameByTyp
 
 var LoadInstanceHandlerType reflect.Type = reflect.Zero(reflect.TypeOf((*LoadInstanceHandler)(nil)).Elem()).Type()
 var LoadInstanceHandlerTypeName string = util.ClassUtil.GetClassNameByType(LoadInstanceHandlerType)
+
+var AppLogerType reflect.Type = reflect.Zero(reflect.TypeOf((*AppLoger)(nil)).Elem()).Type()
+var AppLogerTypeName string = util.ClassUtil.GetClassNameByType(AppLogerType)

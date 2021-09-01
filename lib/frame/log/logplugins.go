@@ -1,7 +1,8 @@
-package logclass
+package log
 
 import (
-	"github.com/dxq174510447/goframe/lib/frame/context"
+	"context"
+	"time"
 )
 
 // logback相关
@@ -15,14 +16,14 @@ import (
 // appender 是往上叠加的
 
 type LogAppender interface {
-	AppendRow(local *context.LocalStack, level string, config *LoggerConfig, row string, err interface{})
+	AppendRow(local context.Context, level string, config *LoggerConfig, row string, err interface{})
 	AppenderKey() string
 	NewAppender(ele *LogAppenderXmlEle) LogAppender
 	SetAppenderProperty(property *AppenderProperty)
 }
 
 type LogLayouter interface {
-	DoLayout(local *context.LocalStack, level string, config *LoggerConfig, row string, err interface{}) []byte
+	DoLayout(local context.Context, level string, config *LoggerConfig, row string, err interface{}) []byte
 }
 
 type AppenderProperty struct {
@@ -33,7 +34,7 @@ type AppenderProperty struct {
 type LogFilter interface {
 
 	// LogDecide 返回DENY NEUTRAL ACCEPT
-	LogDecide(local *context.LocalStack, level string, config *LoggerConfig) string
+	LogDecide(local context.Context, level string, config *LoggerConfig) string
 
 	FilterKey() string
 
@@ -104,4 +105,16 @@ type LogLoggerXmlEle struct {
 	Level       string                  `xml:"level,attr"`
 	Additivity  string                  `xml:"additivity,attr"`
 	AppenderRef []*LogAppenderRefXmlEle `xml:"appender-ref"`
+}
+
+type LogMessage struct {
+	Name     string
+	Level    string
+	Line     string
+	FileName string
+	Msg      string
+	Err      interface{}
+	Thread   string
+	Date     *time.Time
+	Context  context.Context
 }

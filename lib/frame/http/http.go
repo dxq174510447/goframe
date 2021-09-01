@@ -1,16 +1,14 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/application"
-	"github.com/dxq174510447/goframe/lib/frame/context"
 	"github.com/dxq174510447/goframe/lib/frame/exception"
-	"github.com/dxq174510447/goframe/lib/frame/log/logclass"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/core"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"github.com/dxq174510447/goframe/lib/frame/util"
-	"github.com/dxq174510447/goframe/lib/frame/vo"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -148,7 +146,7 @@ func (d *DispatchServlet) GetRouteMapping() []*RouteMapping {
 	return d.routeMapping
 }
 
-func (d *DispatchServlet) Dispatch(local *context.LocalStack, request *http.Request, response http.ResponseWriter) {
+func (d *DispatchServlet) Dispatch(local context.Context, request *http.Request, response http.ResponseWriter) {
 	controller := GetCurrentControllerInvoker(local)
 
 	var proxyMethod *proxyclass.ProxyMethod

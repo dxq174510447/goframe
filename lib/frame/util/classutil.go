@@ -105,4 +105,14 @@ func (c *classUtil) GetJavaFileNameByType(name string) string {
 	}
 }
 
+func (c *classUtil) IsNil(target interface{}) bool {
+	if target == nil {
+		return true
+	}
+	if reflect.ValueOf(target).IsNil() {
+		return true
+	}
+	return false
+}
+
 var ClassUtil classUtil = classUtil{}

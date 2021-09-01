@@ -1,21 +1,20 @@
 package http
 
 import (
+	"context"
 	"github.com/dxq174510447/goframe/lib/frame/application"
-	"github.com/dxq174510447/goframe/lib/frame/context"
-	"github.com/dxq174510447/goframe/lib/frame/log/logclass"
 	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 )
 
 type HttpControllerLoadStrategy struct {
-	Logger logclass.AppLoger `FrameAutowired:""`
+	logger application.AppLoger `FrameAutowired:""`
 }
 
-func (h *HttpControllerLoadStrategy) LoadInstance(local *context.LocalStack, target1 *application.DynamicProxyInstanceNode,
-	application *application.FrameApplication,
-	applicationContext *application.FrameApplicationContext) bool {
+func (h *HttpControllerLoadStrategy) LoadInstance(local context.Context, target *application.DynamicProxyInstanceNode,
+	application *application.Application,
+	applicationContext *application.ApplicationContext) bool {
 
-	if target1 == nil {
+	if target == nil {
 		return false
 	}
 	target := target1.Target
