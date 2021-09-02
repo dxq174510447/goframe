@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/ctx"
-	"github.com/dxq174510447/goframe/lib/frame/proxy/proxyclass"
 	"net/http"
 	"runtime"
 )
@@ -24,6 +23,20 @@ const (
 	CurrentHttpRequest = "CurrentHttpRequest_"
 
 	CurrentHttpResponse = "CurrentHttpResponse_"
+
+	RestControllerAnnotationName = "RestController"
+
+	RequestMappingAnnotationName = "RequestMapping"
+
+	RequestParamAnnotationName = "RequestParam"
+
+	RequestBodyAnnotationName = "RequestBody"
+
+	CookieValueAnnotationName = "CookieValue"
+
+	PathVariableAnnotationName = "PathVariable"
+
+	RequestHeaderAnnotationName = "RequestHeader"
 )
 
 func SetCurrentControllerInvoker(local context.Context, invoker1 *ControllerVar) {

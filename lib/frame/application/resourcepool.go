@@ -97,4 +97,5 @@ func init() {
 	// 默认添加
 	resourcePool.RegisterSysInterfaceType(ApplicationContextListenerType)
 	resourcePool.RegisterSysInterfaceType(LoadInstanceHandlerType)
+	resourcePool.RegisterSysInterfaceType(AnnotationSpiType)
 }

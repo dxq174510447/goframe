@@ -521,6 +521,16 @@ type AppLogFactoryer interface {
 	GetLoggerString(className string) AppLoger
 }
 
+type Annotation interface {
+	AnnotationValue() interface{}
+}
+
+type AnnotationSpi interface {
+	AnnotationName(ctx context.Context) string
+
+	NewAnnotation(ctx context.Context) Annotation
+}
+
 type AppLoger interface {
 	Trace(local context.Context, format string, a ...interface{})
 

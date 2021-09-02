@@ -31,3 +31,6 @@ var LoadInstanceHandlerTypeName string = util.ClassUtil.GetClassNameByType(LoadI
 
 var AppLogerType reflect.Type = reflect.Zero(reflect.TypeOf((*AppLoger)(nil)).Elem()).Type()
 var AppLogerTypeName string = util.ClassUtil.GetClassNameByType(AppLogerType)
+
+var AnnotationSpiType reflect.Type = reflect.Zero(reflect.TypeOf((*AnnotationSpi)(nil)).Elem()).Type()
+var AnnotationSpiTypeName string = util.ClassUtil.GetClassNameByType(AnnotationSpiType)
