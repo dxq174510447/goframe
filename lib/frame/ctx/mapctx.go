@@ -3,12 +3,12 @@ package ctx
 import (
 	"context"
 	"fmt"
-	"github.com/dxq174510447/goframe/lib/frame/util"
+	"github.com/dxq174510447/goframe/lib/frame/structure"
 )
 
 type StackCtx struct {
 	context.Context
-	stack *util.Stack
+	stack *structure.Stack
 }
 
 func (m *StackCtx) Value(key interface{}) interface{} {
@@ -33,7 +33,7 @@ func (m *StackCtx) Value(key interface{}) interface{} {
 func WithNewCtx(ctx context.Context) context.Context {
 	mc := &StackCtx{
 		Context: ctx,
-		stack:   util.NewStack(),
+		stack:   structure.NewStack(),
 	}
 	return mc
 }
@@ -45,7 +45,7 @@ func WithStackPush(ctx context.Context) context.Context {
 	} else {
 		mc = &StackCtx{
 			Context: ctx,
-			stack:   util.NewStack(),
+			stack:   structure.NewStack(),
 		}
 	}
 	mc.stack.Push()
@@ -80,7 +80,7 @@ func WithValue(ctx context.Context, key string, val interface{}) context.Context
 	} else {
 		mc = &StackCtx{
 			Context: ctx,
-			stack:   util.NewStack(),
+			stack:   structure.NewStack(),
 		}
 	}
 	mc.stack.Set(key, val)

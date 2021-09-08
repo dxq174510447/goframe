@@ -1,4 +1,4 @@
-package util
+package structure
 
 //Stack 栈->元素map
 type Stack struct {
