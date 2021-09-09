@@ -526,9 +526,9 @@ type Annotation interface {
 }
 
 type AnnotationSpi interface {
-	AnnotationName(ctx context.Context) string
+	AnnotationName() string
 
-	NewAnnotation(ctx context.Context) Annotation
+	NewAnnotation() Annotation
 }
 
 type AppLoger interface {

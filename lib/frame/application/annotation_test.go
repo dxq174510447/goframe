@@ -22,6 +22,21 @@ func TestGenerateYaml(t *testing.T) {
 
 func TestGenerateObject(t *testing.T) {
 
+	rc := &RestControllerAnnotationSpi{}
+	GetAnnotationFactory().AddAnnotationSpi(rc)
+	rm := &RequestMappingAnnotationSpi{}
+	GetAnnotationFactory().AddAnnotationSpi(rm)
+	rr := &RequestParamAnnotationSpi{}
+	GetAnnotationFactory().AddAnnotationSpi(rr)
+	rb := &RequestBodyAnnotationSpi{}
+	GetAnnotationFactory().AddAnnotationSpi(rb)
+	cv := &CookieValueAnnotationSpi{}
+	GetAnnotationFactory().AddAnnotationSpi(cv)
+	pv := &PathVariableAnnotationSpi{}
+	GetAnnotationFactory().AddAnnotationSpi(pv)
+	rh := &RequestHeaderAnnotationSpi{}
+	GetAnnotationFactory().AddAnnotationSpi(rh)
+
 	body, err := ioutil.ReadFile(inputFile)
 	if err != nil {
 		panic(err)

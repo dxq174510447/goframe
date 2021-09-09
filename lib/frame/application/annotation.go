@@ -1,9 +1,5 @@
 package application
 
-import (
-	"context"
-)
-
 const (
 	AnnotationRestController = "AnnotationRestController_"
 
@@ -45,11 +41,11 @@ func (c *RestControllerAnnotation) AnnotationValue() interface{} {
 type RestControllerAnnotationSpi struct {
 }
 
-func (c *RestControllerAnnotationSpi) AnnotationName(ctx context.Context) string {
+func (c *RestControllerAnnotationSpi) AnnotationName() string {
 	return RestControllerAnnotationName
 }
 
-func (c *RestControllerAnnotationSpi) NewAnnotation(ctx context.Context) Annotation {
+func (c *RestControllerAnnotationSpi) NewAnnotation() Annotation {
 	return &RestControllerAnnotation{}
 }
 
@@ -65,11 +61,11 @@ func (c *RequestMappingAnnotation) AnnotationValue() interface{} {
 type RequestMappingAnnotationSpi struct {
 }
 
-func (c *RequestMappingAnnotationSpi) AnnotationName(ctx context.Context) string {
+func (c *RequestMappingAnnotationSpi) AnnotationName() string {
 	return RequestMappingAnnotationName
 }
 
-func (c *RequestMappingAnnotationSpi) NewAnnotation(ctx context.Context) Annotation {
+func (c *RequestMappingAnnotationSpi) NewAnnotation() Annotation {
 	return &RequestMappingAnnotation{}
 }
 
@@ -85,11 +81,11 @@ func (r *RequestParamAnnotation) AnnotationValue() interface{} {
 type RequestParamAnnotationSpi struct {
 }
 
-func (r *RequestParamAnnotationSpi) AnnotationName(ctx context.Context) string {
+func (r *RequestParamAnnotationSpi) AnnotationName() string {
 	return RequestParamAnnotationName
 }
 
-func (r *RequestParamAnnotationSpi) NewAnnotation(ctx context.Context) Annotation {
+func (r *RequestParamAnnotationSpi) NewAnnotation() Annotation {
 	return &RequestParamAnnotation{}
 }
 
@@ -105,11 +101,11 @@ func (r *RequestHeaderAnnotation) AnnotationValue() interface{} {
 type RequestHeaderAnnotationSpi struct {
 }
 
-func (r *RequestHeaderAnnotationSpi) AnnotationName(ctx context.Context) string {
+func (r *RequestHeaderAnnotationSpi) AnnotationName() string {
 	return RequestHeaderAnnotationName
 }
 
-func (r *RequestHeaderAnnotationSpi) NewAnnotation(ctx context.Context) Annotation {
+func (r *RequestHeaderAnnotationSpi) NewAnnotation() Annotation {
 	return &RequestHeaderAnnotation{}
 }
 
@@ -125,11 +121,11 @@ func (r *CookieValueAnnotation) AnnotationValue() interface{} {
 type CookieValueAnnotationSpi struct {
 }
 
-func (r *CookieValueAnnotationSpi) AnnotationName(ctx context.Context) string {
+func (r *CookieValueAnnotationSpi) AnnotationName() string {
 	return CookieValueAnnotationName
 }
 
-func (r *CookieValueAnnotationSpi) NewAnnotation(ctx context.Context) Annotation {
+func (r *CookieValueAnnotationSpi) NewAnnotation() Annotation {
 	return &CookieValueAnnotation{}
 }
 
@@ -143,11 +139,11 @@ func (r *RequestBodyAnnotation) AnnotationValue() interface{} {
 type RequestBodyAnnotationSpi struct {
 }
 
-func (r *RequestBodyAnnotationSpi) AnnotationName(ctx context.Context) string {
+func (r *RequestBodyAnnotationSpi) AnnotationName() string {
 	return RequestBodyAnnotationName
 }
 
-func (r *RequestBodyAnnotationSpi) NewAnnotation(ctx context.Context) Annotation {
+func (r *RequestBodyAnnotationSpi) NewAnnotation() Annotation {
 	return &RequestBodyAnnotation{}
 }
 
@@ -162,11 +158,11 @@ func (r *PathVariableAnnotation) AnnotationValue() interface{} {
 type PathVariableAnnotationSpi struct {
 }
 
-func (r *PathVariableAnnotationSpi) AnnotationName(ctx context.Context) string {
+func (r *PathVariableAnnotationSpi) AnnotationName() string {
 	return PathVariableAnnotationName
 }
 
-func (r *PathVariableAnnotationSpi) NewAnnotation(ctx context.Context) Annotation {
+func (r *PathVariableAnnotationSpi) NewAnnotation() Annotation {
 	return &PathVariableAnnotation{}
 }
 
