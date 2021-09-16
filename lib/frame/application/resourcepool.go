@@ -14,6 +14,8 @@ type ResourcePool struct {
 	//LogConfigMap map[string]string
 	// 实例池
 	ProxyInsPool *DynamicProxyLinkedArray
+
+	ClassInfoList []string
 }
 
 // RegisterInterfaceType 接口类型 可以见RegisterInterfaceType(ApplicationContextListenerType)
@@ -33,6 +35,10 @@ func (r *ResourcePool) RegisterSysInterfaceType(t reflect.Type) {
 // 加载规则，默认加载default,然后从启动项或者环境变量中获取spring.profiles.active，如果获取到就加载，获取不到就加载local
 func (r *ResourcePool) AddConfigYaml(name string, config string) {
 	resourcePool.ConfigMap[name] = config
+}
+
+func (r *ResourcePool) AddClassInfo(info string) {
+	resourcePool.ClassInfoList = append(resourcePool.ClassInfoList, info)
 }
 
 func (r *ResourcePool) RegisterLogFactory(logfactory AppLogFactoryer) {
@@ -85,8 +91,9 @@ func (r *ResourcePool) RegisterInstance(name string, instance interface{}) {
 }
 
 var resourcePool ResourcePool = ResourcePool{
-	ConfigMap:    make(map[string]string),
-	ProxyInsPool: &DynamicProxyLinkedArray{},
+	ConfigMap:     make(map[string]string),
+	ProxyInsPool:  &DynamicProxyLinkedArray{},
+	ClassInfoList: make([]string, 0, 0),
 }
 
 func GetResourcePool() *ResourcePool {

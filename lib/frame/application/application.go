@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/ctx"
 	"github.com/dxq174510447/goframe/lib/frame/util"
+	"gopkg.in/yaml.v3"
 	"reflect"
 	"sort"
 	"strings"
@@ -78,6 +79,8 @@ func (a *Application) Run(args []string) *ApplicationContext {
 	appConfig := a.PrepareEnvironment(local, listeners, appArg)
 
 	applicationContext = a.CreateApplicationContext(local, appConfig)
+
+	a.LoadClassInfo(local, applicationContext)
 
 	a.RefreshContext(local, applicationContext)
 
@@ -338,6 +341,26 @@ func (a *Application) ConfigureEnvironment(local context.Context,
 		}
 	}
 
+}
+
+func (a *Application) LoadClassInfo(local context.Context, applicationContext *ApplicationContext) {
+
+	if spis, ok := resourcePool.ProxyInsPool.SysInterfaceImplNameMap[AnnotationSpiTypeName]; ok {
+		for _, spi := range spis {
+			GetAnnotationFactory().AddAnnotationSpi(spi.Target.(AnnotationSpi))
+		}
+	}
+
+	for _, classInfo := range GetResourcePool().ClassInfoList {
+		var infos []*ClassV1
+		err := yaml.Unmarshal([]byte(classInfo), &infos)
+		if err != nil {
+			panic(err)
+		}
+		for _, info := range infos {
+			applicationContext.addClassInfo(info.PkgName, info)
+		}
+	}
 }
 
 func NewApplication(main interface{}) *Application {

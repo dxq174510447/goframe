@@ -249,6 +249,8 @@ type DynamicProxyInstanceNode struct {
 	// 目标对象 指针
 	Target interface{}
 
+	ClassInfo *ClassV1
+
 	// 下一个节点
 	Next *DynamicProxyInstanceNode
 

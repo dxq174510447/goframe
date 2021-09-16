@@ -25,7 +25,14 @@ type ApplicationContext struct {
 	// key可能是接口全名 也可能是 struct全名
 	ElementTypeNameMap map[string][]*DynamicProxyInstanceNode
 
+	// class全名 ---> class描述
+	ClassInfoMap map[string]*ClassV1
+
 	logger AppLoger
+}
+
+func (a *ApplicationContext) addClassInfo(className string, info *ClassV1) {
+	a.ClassInfoMap[className] = info
 }
 
 func (a *ApplicationContext) addInstance(target *DynamicProxyInstanceNode) {
@@ -101,6 +108,7 @@ func NewApplicationContext(appConfig *ApplicationConfig, application *Applicatio
 		FrameHttpStarter:   application.FrameHttpStarter,
 		ElementMap:         make(map[string]*DynamicProxyInstanceNode),
 		ElementTypeNameMap: make(map[string][]*DynamicProxyInstanceNode),
+		ClassInfoMap:       make(map[string]*ClassV1),
 	}
 	applicationContext.logger = GetResourcePool().ProxyInsPool.LogFactory.GetLoggerType(reflect.TypeOf(applicationContext))
 	return applicationContext
