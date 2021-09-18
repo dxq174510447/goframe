@@ -226,7 +226,7 @@ func (d *DynamicProxyLinkedArray) AddInterfacer(t reflect.Type) {
 		err := fmt.Errorf("%s is not interface type", t.Name())
 		panic(err)
 	}
-	d.InterfaceTypeNameMap[util.ClassUtil.GetClassNameByType(t)] = t
+	d.InterfaceTypeNameMap[util.ClassUtil.GetClassNameByTypeV1(t)] = t
 }
 
 func (d *DynamicProxyLinkedArray) AddSysInterfacer(t reflect.Type) {
@@ -235,7 +235,7 @@ func (d *DynamicProxyLinkedArray) AddSysInterfacer(t reflect.Type) {
 		err := fmt.Errorf("%s is not interface type", t.Name())
 		panic(err)
 	}
-	name := util.ClassUtil.GetClassNameByType(t)
+	name := util.ClassUtil.GetClassNameByTypeV1(t)
 	d.InterfaceTypeNameMap[name] = t
 	d.SysInterfaceTypeNameMap[name] = t
 }
@@ -323,10 +323,10 @@ func (i *InsValueInjectTree) SetTreeNode(key string,
 				// 先不管吧
 				current.MapValue = append(current.MapValue, objectVal)
 			case reflect.Ptr:
-				name := util.ClassUtil.GetClassNameByType(field.Type.Elem())
+				name := util.ClassUtil.GetClassNameByTypeV1(field.Type.Elem())
 				current.ObjectValue[name] = objectVal
 			case reflect.Struct:
-				name := util.ClassUtil.GetClassNameByType(field.Type)
+				name := util.ClassUtil.GetClassNameByTypeV1(field.Type)
 				current.ObjectValue[name] = objectVal
 			}
 		}
@@ -347,7 +347,7 @@ func (i *InsValueInjectTree) getValueForType(key string, t reflect.Type) *reflec
 	case reflect.Map:
 		return nil
 	case reflect.Ptr:
-		name := util.ClassUtil.GetClassNameByType(t.Elem())
+		name := util.ClassUtil.GetClassNameByTypeV1(t.Elem())
 
 		if v, ok1 := node.ObjectValue[name]; ok1 {
 			m := reflect.ValueOf(v)
@@ -356,7 +356,7 @@ func (i *InsValueInjectTree) getValueForType(key string, t reflect.Type) *reflec
 			return nil
 		}
 	case reflect.Struct:
-		name := util.ClassUtil.GetClassNameByType(t)
+		name := util.ClassUtil.GetClassNameByTypeV1(t)
 		if v, ok1 := node.ObjectValue[name]; ok1 {
 			m := reflect.ValueOf(v).Elem()
 			return &m

@@ -27,7 +27,7 @@ type FrameEventDispatcher struct {
 }
 
 func (f *FrameEventDispatcher) DispatchEvent(local context.Context, event FrameEventer) {
-	eventname := util.ClassUtil.GetClassNameByType(reflect.TypeOf(event).Elem())
+	eventname := util.ClassUtil.GetClassNameByTypeV1(reflect.TypeOf(event).Elem())
 	if listeners, ok := f.listeners[eventname]; ok {
 		f.logger.Debug(local, " event %s has %d listener", eventname, len(listeners))
 		for _, listener := range listeners {
@@ -40,10 +40,10 @@ func (f *FrameEventDispatcher) DispatchEvent(local context.Context, event FrameE
 func (f *FrameEventDispatcher) AddEventListener(local context.Context, listener FrameListener) {
 
 	event := listener.WatchEvent()
-	eventname := util.ClassUtil.GetClassNameByType(reflect.TypeOf(event).Elem())
+	eventname := util.ClassUtil.GetClassNameByTypeV1(reflect.TypeOf(event).Elem())
 
 	if f.logger.IsDebugEnable() {
-		listenername := util.ClassUtil.GetClassNameByType(reflect.TypeOf(listener).Elem())
+		listenername := util.ClassUtil.GetClassNameByTypeV1(reflect.TypeOf(listener).Elem())
 		f.logger.Debug(local, " listener %s listen %s", listenername, eventname)
 	}
 

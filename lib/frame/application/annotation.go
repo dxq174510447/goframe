@@ -166,32 +166,32 @@ func (r *PathVariableAnnotationSpi) NewAnnotation() Annotation {
 	return &PathVariableAnnotation{}
 }
 
-//func init() {
-//	rc := &RestControllerAnnotationSpi{}
-//	_ = AnnotationSpi(rc)
-//	GetResourcePool().RegisterInstance("", rc)
-//
-//	rm := &RequestMappingAnnotationSpi{}
-//	_ = AnnotationSpi(rm)
-//	GetResourcePool().RegisterInstance("", rm)
-//
-//	rr := &RequestParamAnnotationSpi{}
-//	_ = AnnotationSpi(rr)
-//	GetResourcePool().RegisterInstance("", rr)
-//
-//	rb := &RequestBodyAnnotationSpi{}
-//	_ = AnnotationSpi(rb)
-//	GetResourcePool().RegisterInstance("", rb)
-//
-//	cv := &CookieValueAnnotationSpi{}
-//	_ = AnnotationSpi(cv)
-//	GetResourcePool().RegisterInstance("", cv)
-//
-//	pv := &PathVariableAnnotationSpi{}
-//	_ = AnnotationSpi(pv)
-//	GetResourcePool().RegisterInstance("", pv)
-//
-//	rh := &RequestHeaderAnnotationSpi{}
-//	_ = AnnotationSpi(rh)
-//	GetResourcePool().RegisterInstance("", rh)
-//}
+func init() {
+	rc := &RestControllerAnnotationSpi{}
+	_ = AnnotationSpi(rc)
+	GetResourcePool().RegisterInstance("", rc)
+
+	rm := &RequestMappingAnnotationSpi{}
+	_ = AnnotationSpi(rm)
+	GetResourcePool().RegisterInstance("", rm)
+
+	rr := &RequestParamAnnotationSpi{}
+	_ = AnnotationSpi(rr)
+	GetResourcePool().RegisterInstance("", rr)
+
+	rb := &RequestBodyAnnotationSpi{}
+	_ = AnnotationSpi(rb)
+	GetResourcePool().RegisterInstance("", rb)
+
+	cv := &CookieValueAnnotationSpi{}
+	_ = AnnotationSpi(cv)
+	GetResourcePool().RegisterInstance("", cv)
+
+	pv := &PathVariableAnnotationSpi{}
+	_ = AnnotationSpi(pv)
+	GetResourcePool().RegisterInstance("", pv)
+
+	rh := &RequestHeaderAnnotationSpi{}
+	_ = AnnotationSpi(rh)
+	GetResourcePool().RegisterInstance("", rh)
+}

@@ -35,6 +35,9 @@ func (a *ApplicationContext) addClassInfo(className string, info *ClassV1) {
 	a.ClassInfoMap[className] = info
 }
 
+/**
+添加指针
+*/
 func (a *ApplicationContext) addInstance(target *DynamicProxyInstanceNode) {
 	k := target.Id
 	if _, ok := a.ElementMap[k]; ok {
@@ -43,7 +46,7 @@ func (a *ApplicationContext) addInstance(target *DynamicProxyInstanceNode) {
 	}
 	a.ElementMap[k] = target
 
-	name := util.ClassUtil.GetClassName(target.Target)
+	name := util.ClassUtil.GetClassNameV1(target.Target)
 	if _, ok := a.ElementTypeNameMap[name]; ok {
 		err := fmt.Errorf("instance name %s alreay exists,plese rename", name)
 		panic(err)
@@ -52,7 +55,7 @@ func (a *ApplicationContext) addInstance(target *DynamicProxyInstanceNode) {
 }
 
 func (a *ApplicationContext) addInterfaceImpl(ier reflect.Type, target *DynamicProxyInstanceNode) {
-	k := util.ClassUtil.GetClassNameByType(ier)
+	k := util.ClassUtil.GetClassNameByTypeV1(ier)
 	if t, ok := a.ElementTypeNameMap[k]; ok {
 		t = append(t, target)
 		a.ElementTypeNameMap[k] = t
@@ -62,7 +65,7 @@ func (a *ApplicationContext) addInterfaceImpl(ier reflect.Type, target *DynamicP
 }
 
 func (a *ApplicationContext) getByInterfaceType(ier reflect.Type) *DynamicProxyInstanceNode {
-	k := util.ClassUtil.GetClassNameByType(ier)
+	k := util.ClassUtil.GetClassNameByTypeV1(ier)
 	arr := a.ElementTypeNameMap[k]
 	if len(arr) == 0 {
 		return nil

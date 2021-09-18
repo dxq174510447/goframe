@@ -57,7 +57,7 @@ func (r *ResourcePool) RegisterInstance(name string, instance interface{}) {
 	var key string = name
 
 	if key == "" {
-		key = util.ClassUtil.GetSimpleClassName(instance)
+		key = util.ClassUtil.GetSimpleClassNameV1(instance)
 	}
 
 	node := &DynamicProxyInstanceNode{

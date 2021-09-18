@@ -24,13 +24,13 @@ const (
 )
 
 var ApplicationContextListenerType reflect.Type = reflect.Zero(reflect.TypeOf((*ApplicationContextListener)(nil)).Elem()).Type()
-var ApplicationContextListenerTypeName string = util.ClassUtil.GetClassNameByType(ApplicationContextListenerType)
+var ApplicationContextListenerTypeName string = util.ClassUtil.GetClassNameByTypeV1(ApplicationContextListenerType)
 
 var LoadInstanceHandlerType reflect.Type = reflect.Zero(reflect.TypeOf((*LoadInstanceHandler)(nil)).Elem()).Type()
-var LoadInstanceHandlerTypeName string = util.ClassUtil.GetClassNameByType(LoadInstanceHandlerType)
+var LoadInstanceHandlerTypeName string = util.ClassUtil.GetClassNameByTypeV1(LoadInstanceHandlerType)
 
 var AppLogerType reflect.Type = reflect.Zero(reflect.TypeOf((*AppLoger)(nil)).Elem()).Type()
-var AppLogerTypeName string = util.ClassUtil.GetClassNameByType(AppLogerType)
+var AppLogerTypeName string = util.ClassUtil.GetClassNameByTypeV1(AppLogerType)
 
 var AnnotationSpiType reflect.Type = reflect.Zero(reflect.TypeOf((*AnnotationSpi)(nil)).Elem()).Type()
-var AnnotationSpiTypeName string = util.ClassUtil.GetClassNameByType(AnnotationSpiType)
+var AnnotationSpiTypeName string = util.ClassUtil.GetClassNameByTypeV1(AnnotationSpiType)

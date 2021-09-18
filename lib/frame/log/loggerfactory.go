@@ -18,7 +18,7 @@ type LoggerFactory struct {
 }
 
 func (l *LoggerFactory) GetLoggerType(p reflect.Type) application.AppLoger {
-	name := util.ClassUtil.GetJavaClassNameByType(p)
+	name := util.ClassUtil.GetClassNameByTypeV1(p)
 	return l.GetLoggerString(name)
 }
 

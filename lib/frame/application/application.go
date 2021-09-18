@@ -111,6 +111,10 @@ func (a *Application) CreateApplicationContext(local context.Context, appConfig 
 	return applicationContext
 }
 
+func (a *Application) beanInject(local context.Context, node *DynamicProxyInstanceNode) {
+
+}
+
 // RefreshContext 加载实例
 func (a *Application) RefreshContext(local context.Context, applicationContext *ApplicationContext) {
 
@@ -176,7 +180,7 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 							}
 						} else {
 							//指针注入
-							name := util.ClassUtil.GetSimpleClassNameByType(field.Type.Elem())
+							name := util.ClassUtil.GetSimpleClassNameByTypeV1(field.Type.Elem())
 							if ele, ok1 := insPool.ElementMap[name]; ok1 {
 								if ele.Target != nil {
 									//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", current.Id, field.Name, ele.Id)
@@ -281,7 +285,7 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 						}
 					} else {
 						//指针注入
-						name := util.ClassUtil.GetSimpleClassNameByType(field.Type.Elem())
+						name := util.ClassUtil.GetSimpleClassNameByTypeV1(field.Type.Elem())
 						if ele, ok1 := insPool.ElementMap[name]; ok1 {
 							if ele.Target != nil {
 								//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", ele1.Id, field.Name, ele.Id)
@@ -294,7 +298,7 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 
 				if !inject {
 					panic(fmt.Sprintf("找不到 类型 %s 的属性 %s 的实现类",
-						util.ClassUtil.GetClassNameByType(ele1.rt.Elem()),
+						util.ClassUtil.GetClassNameByTypeV1(ele1.rt.Elem()),
 						field.Name))
 				}
 			}
