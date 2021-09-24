@@ -111,7 +111,19 @@ func (a *Application) CreateApplicationContext(local context.Context, appConfig 
 	return applicationContext
 }
 
-func (a *Application) beanInject(local context.Context, node *DynamicProxyInstanceNode) {
+func (a *Application) beanInject(local context.Context, current *DynamicProxyInstanceNode) {
+
+	if current == nil {
+		return
+	}
+
+	if len(current.instanceInject) == 0 && len(current.configInjectField) == 0 {
+		return
+	}
+
+	for _, field := range current.instanceInject {
+
+	}
 
 }
 
