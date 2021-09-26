@@ -111,20 +111,113 @@ func (a *Application) CreateApplicationContext(local context.Context, appConfig 
 	return applicationContext
 }
 
-func (a *Application) beanInject(local context.Context, current *DynamicProxyInstanceNode) {
+//beanInject bool 返回的是否全部注入完成 true是 false否
+func (a *Application) beanInject(local context.Context, applicationContext *ApplicationContext,
+	current *DynamicProxyInstanceNode, errIfNot bool, injectValue bool) (bool, error) {
 
 	if current == nil {
-		return
+		return true, nil
 	}
 
 	if len(current.instanceInject) == 0 && len(current.configInjectField) == 0 {
-		return
+		return true, nil
 	}
 
+	// 是否全部注入
+	var allInject bool = true
 	for _, field := range current.instanceInject {
 
+		fv := reflect.ValueOf(current.Target).Elem().FieldByName(field.Name)
+		if !fv.IsZero() {
+			continue
+		}
+
+		if field.Type == AppLogerType {
+			logger := GetResourcePool().ProxyInsPool.LogFactory.GetLoggerType(current.rt)
+			fv.Set(reflect.ValueOf(logger))
+			continue
+		}
+
+		var key string
+		var ok bool
+
+		if key, ok = field.Tag.Lookup(AutowiredInjectKey); !ok {
+			continue
+		}
+
+		if key != "" {
+			// 根据id注入
+			if ele, ok1 := GetResourcePool().ProxyInsPool.ElementMap[key]; ok1 {
+				//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", current.Id, field.Name, ele.Id)
+				fv.Set(reflect.ValueOf(ele.Target))
+			} else {
+				allInject = false
+			}
+		} else {
+			// 根据类型注入
+			if field.Type.Kind() == reflect.Interface {
+				//接口注入
+				ele := applicationContext.getByInterfaceType(field.Type)
+				if ele != nil {
+					//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", current.Id, field.Name, ele.Id)
+					fv.Set(reflect.ValueOf(ele.Target))
+				} else {
+					allInject = false
+				}
+			} else {
+				//指针注入
+				typeName := util.ClassUtil.GetClassNameByTypeV1(field.Type.Elem())
+				if ele, ok1 := GetResourcePool().ProxyInsPool.ElementTypeNameMap[typeName]; ok1 {
+					//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", current.Id, field.Name, ele.Id)
+					fv.Set(reflect.ValueOf(ele.Target))
+				} else {
+					allInject = false
+				}
+			}
+		}
+
+		if errIfNot && !allInject {
+			panic(fmt.Sprintf("找不到 类型 %s 的属性 %s 的实现类",
+				util.ClassUtil.GetClassNameByTypeV1(current.rt.Elem()),
+				field.Name))
+		}
 	}
 
+	if injectValue {
+		for _, field := range current.configInjectField {
+
+			var key string
+			var ok bool
+
+			if key, ok = field.Tag.Lookup(ValueInjectKey); !ok {
+				continue
+			}
+
+			if key == "" {
+				continue
+			}
+
+			var configkey string
+			var configval string
+			if isContainElexpress(key) {
+				b := strings.Index(key, "{")
+				e := strings.LastIndex(key, "}")
+				k1 := key[b+1 : e]
+				d := strings.Index(k1, ":")
+				if d == -1 {
+					configkey = k1
+				} else {
+					configkey = k1[0:d]
+					configval = k1[d+1 : len(k1)]
+				}
+				applicationContext.ValueBindTree.SetBindValue(current, field, configkey, configval)
+			} else {
+				applicationContext.ValueBindTree.SetBindValue(current, field, "", key)
+			}
+			//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入配置", current.Id, field.Name)
+		}
+	}
+	return allInject, nil
 }
 
 // RefreshContext 加载实例
@@ -142,7 +235,7 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 	current := insPool.FirstElement
 
 	// 第一轮注入的时候 找不到对象 可能是factoryer还没生成 放到第二轮注入 暂时只支持2轮
-	firstNilInject := make([]*DynamicProxyInstanceNode, 0, 30)
+	nonInject := make([]*DynamicProxyInstanceNode, 0, 30)
 
 	for current != nil {
 
@@ -154,169 +247,37 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 			}
 		}
 
-		if len(current.instanceInject) > 0 || len(current.configInjectField) > 0 {
-
-			// 类型注入
-			for _, field := range current.instanceInject {
-
-				if field.Type == AppLogerType {
-					logger := GetResourcePool().ProxyInsPool.LogFactory.GetLoggerType(current.rt)
-					reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(logger))
-					continue
-				}
-
-				// 安类型 或者id注入
-				if key, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
-
-					var inject bool = false
-					if key != "" {
-						// 指定id注入
-						if ele, ok1 := insPool.ElementMap[key]; ok1 {
-							if ele.Target != nil {
-								//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", current.Id, field.Name, ele.Id)
-								reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
-								inject = true
-							}
-						}
-					} else {
-
-						if field.Type.Kind() == reflect.Interface {
-							// 根据接口类型注入
-							ele := applicationContext.getByInterfaceType(field.Type)
-							if ele != nil {
-								if ele.Target != nil {
-									//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", current.Id, field.Name, ele.Id)
-									reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
-									inject = true
-								}
-							}
-						} else {
-							//指针注入
-							name := util.ClassUtil.GetSimpleClassNameByTypeV1(field.Type.Elem())
-							if ele, ok1 := insPool.ElementMap[name]; ok1 {
-								if ele.Target != nil {
-									//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", current.Id, field.Name, ele.Id)
-									reflect.ValueOf(current.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
-									inject = true
-								}
-							}
-						}
-					}
-
-					// 如果没有注入 放到后期注入
-					if !inject {
-						firstNilInject = append(firstNilInject, current)
-					}
-				}
-			}
-
-			// 配置项注入
-			for _, field := range current.configInjectField {
-				if key, ok := field.Tag.Lookup(ValueInjectKey); ok {
-					if key == "" {
-						continue
-					}
-					var configkey string
-					var configval string
-					if isContainElexpress(key) {
-						b := strings.Index(key, "{")
-						e := strings.LastIndex(key, "}")
-						k1 := key[b+1 : e]
-						d := strings.Index(k1, ":")
-						if d == -1 {
-							configkey = k1
-						} else {
-							configkey = k1[0:d]
-							configval = k1[d+1 : len(k1)]
-						}
-						applicationContext.ValueBindTree.SetBindValue(current, field, configkey, configval)
-					} else {
-						applicationContext.ValueBindTree.SetBindValue(current, field, "", key)
-					}
-					//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入配置", current.Id, field.Name)
-				}
-			}
+		inject, err := a.beanInject(local, applicationContext, current, false, true)
+		if err != nil {
+			panic(err)
 		}
 
-		var add bool = false
+		if !inject {
+			nonInject = append(nonInject, current)
+		}
+
 		if len(a.LoadStrategy) > 0 {
 			for _, strategy := range a.LoadStrategy {
-				add = strategy.LoadInstance(local, current, a, applicationContext)
-				if add {
-					//a.logger.Debug(local, "[初始化] 自定义加载 加载器 %s 加载 %s",
-					//	util.ClassUtil.GetJavaClassNameByType(reflect.TypeOf(reflect.ValueOf(strategy).Elem().Interface())), current.Id)
+				process, err := strategy.LoadInstance(local, current, a, applicationContext)
+				if err != nil {
+					panic(err)
+				}
+				if process {
 					break
 				}
 			}
 		}
-		//if !add {
-		//	core.AddClassProxy(current.Target)
-		//}
 
 		current = current.Next
 	}
 
 	// 第二轮注入
-	for _, ele1 := range firstNilInject {
-
-		if ele1 == nil {
-			continue
-		}
-
-		for _, field := range ele1.instanceInject {
-
-			// 特殊类型 日志类型注入 第一轮已经注入
-			if field.Type == AppLogerType {
-				continue
-			}
-
-			if key, ok := field.Tag.Lookup(AutowiredInjectKey); ok {
-
-				// 字段值为空的话 第二轮注入
-				zer := reflect.ValueOf(ele1.Target).Elem().FieldByName(field.Name).IsZero()
-				if !zer {
-					continue
-				}
-
-				var inject bool = false
-				if key != "" {
-					if ele, ok1 := insPool.ElementMap[key]; ok1 {
-						if ele.Target != nil {
-							//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", ele1.Id, field.Name, ele.Id)
-							reflect.ValueOf(ele1.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
-							inject = true
-						}
-					}
-				} else {
-					if field.Type.Kind() == reflect.Interface {
-						ele := applicationContext.getByInterfaceType(field.Type)
-						if ele != nil && ele.Target != nil {
-							//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", ele1.Id, field.Name, ele.Id)
-							reflect.ValueOf(ele1.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
-							inject = true
-						}
-					} else {
-						//指针注入
-						name := util.ClassUtil.GetSimpleClassNameByTypeV1(field.Type.Elem())
-						if ele, ok1 := insPool.ElementMap[name]; ok1 {
-							if ele.Target != nil {
-								//a.logger.Debug(local, "[初始化] 实例加载 %s %s 注入实例id %s", ele1.Id, field.Name, ele.Id)
-								reflect.ValueOf(ele1.Target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(ele.Target))
-								inject = true
-							}
-						}
-					}
-				}
-
-				if !inject {
-					panic(fmt.Sprintf("找不到 类型 %s 的属性 %s 的实现类",
-						util.ClassUtil.GetClassNameByTypeV1(ele1.rt.Elem()),
-						field.Name))
-				}
-			}
+	for _, current := range nonInject {
+		_, err := a.beanInject(local, applicationContext, current, true, false)
+		if err != nil {
+			panic(err)
 		}
 	}
-
 }
 
 // ConfigureEnvironment 加载配置文件

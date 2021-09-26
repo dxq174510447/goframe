@@ -70,10 +70,10 @@ func (a *ApplicationRunContextListeners) Failed(local context.Context, applicati
 */
 type LoadInstanceHandler interface {
 
-	// LoadInstance 返回bool 自定义加载返回true 交给框架默认处理返回false
+	//LoadInstance 返回的bool true 该handler已经处理 false 不处理
 	LoadInstance(local context.Context, target *DynamicProxyInstanceNode,
 		application *Application,
-		applicationContext *ApplicationContext) bool
+		applicationContext *ApplicationContext) (bool, error)
 
 	Order() int
 }

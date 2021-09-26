@@ -12,26 +12,27 @@ type FrameListenerLoadStrategy struct {
 func (h *FrameListenerLoadStrategy) LoadInstance(local context.Context,
 	target *application.DynamicProxyInstanceNode,
 	application *application.Application,
-	applicationContext *application.ApplicationContext) bool {
+	applicationContext *application.ApplicationContext) (bool, error) {
 
 	if target == nil {
-		return false
+		return false, nil
 	}
 
 	if f, ok := target.Target.(FrameListener); ok {
 		GetFrameEventDispatcher().AddEventListener(local, f)
-		return false
+		return true, nil
 	}
 
-	return false
+	return false, nil
 }
 
 func (h *FrameListenerLoadStrategy) Order() int {
 	return 100
 }
 
-var frameListenerLoadStrategy FrameListenerLoadStrategy = FrameListenerLoadStrategy{}
-
 func init() {
+	frameListenerLoadStrategy := FrameListenerLoadStrategy{}
+	_ = application.LoadInstanceHandler(&frameListenerLoadStrategy)
+
 	application.GetResourcePool().RegisterInstance("", &frameListenerLoadStrategy)
 }
