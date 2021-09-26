@@ -272,7 +272,7 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 	}
 
 	// 第二轮注入
-	for _, current := range nonInject {
+	for _, current = range nonInject {
 		_, err := a.beanInject(local, applicationContext, current, true, false)
 		if err != nil {
 			panic(err)

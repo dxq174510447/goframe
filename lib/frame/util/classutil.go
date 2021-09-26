@@ -30,12 +30,12 @@ func (c *classUtil) GetErrorValueFromResult(result []reflect.Value) *reflect.Val
 	return returnError
 }
 
-//GetClassName 用来获取struct的全路径 传递指针
+//GetClassNameV1 用来获取struct的全路径 传递指针
 func (c *classUtil) GetClassNameV1(target interface{}) string {
 	return c.GetClassNameByTypeV1(reflect.TypeOf(target))
 }
 
-//GetClassNameByType 接口，非指针到reflect.type类型
+//GetClassNameByTypeV1 接口，非指针到reflect.type类型
 func (c *classUtil) GetClassNameByTypeV1(t reflect.Type) string {
 	if t.Kind() == reflect.Ptr {
 		return fmt.Sprintf("%s/%s", t.Elem().PkgPath(), t.Elem().Name())
@@ -43,12 +43,12 @@ func (c *classUtil) GetClassNameByTypeV1(t reflect.Type) string {
 	return fmt.Sprintf("%s/%s", t.PkgPath(), t.Name())
 }
 
-//GetSimpleClassName 用来获取struct的全路径 传递指针
+//GetSimpleClassNameV1 用来获取struct的全路径 传递指针
 func (c *classUtil) GetSimpleClassNameV1(target interface{}) string {
 	return c.GetSimpleClassNameByTypeV1(reflect.TypeOf(target))
 }
 
-//GetSimpleClassNameByType 接口，非指针到reflect.type类型
+//GetSimpleClassNameByTypeV1 接口，非指针到reflect.type类型
 func (c *classUtil) GetSimpleClassNameByTypeV1(t reflect.Type) string {
 	if t.Kind() == reflect.Ptr {
 		return t.Elem().Name()

@@ -52,6 +52,10 @@ func (a *ApplicationContext) addInstance(target *DynamicProxyInstanceNode) {
 		panic(err)
 	}
 	a.ElementTypeNameMap[name] = []*DynamicProxyInstanceNode{target}
+
+	if classInfo, ok := a.ClassInfoMap[name]; ok {
+		target.ClassInfo = classInfo
+	}
 }
 
 func (a *ApplicationContext) addInterfaceImpl(ier reflect.Type, target *DynamicProxyInstanceNode) {

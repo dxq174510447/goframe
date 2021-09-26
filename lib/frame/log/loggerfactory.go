@@ -97,7 +97,7 @@ func (l *LoggerFactory) AddLevelNode(node *LoggerConfig) {
 		return
 	}
 	current := l.Root
-	keys := strings.Split(node.Name, ".")
+	keys := strings.Split(node.Name, "/")
 	lsize := len(keys)
 	if l.RefMap == nil {
 		l.RefMap = make(map[string]*LoggerConfig)
@@ -114,7 +114,7 @@ func (l *LoggerFactory) AddLevelNode(node *LoggerConfig) {
 			current = children
 		} else {
 			c := &LoggerConfig{
-				Name:        strings.Join(keys[0:i+1], "."),
+				Name:        strings.Join(keys[0:i+1], "/"),
 				Level:       "",
 				Additivity:  true,
 				Parent:      current,
