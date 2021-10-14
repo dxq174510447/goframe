@@ -8,21 +8,48 @@ import (
 	"github.com/dxq174510447/goframe/lib/frame/util"
 	"reflect"
 	"strings"
+	"sync"
 	"text/template"
 )
+
+var defaultLogback = `
+<configuration> 
+  
+  <appender name="DEFAULT_CONSOLE" class="console">
+    <encoder>
+      <pattern>%date [%-5thread] [%-5level] %-10logger{0}.%-5line %msg %n</pattern>
+    </encoder>
+  </appender>
+
+  <root level="debug">
+	<appender-ref ref="DEFAULT_CONSOLE"/>
+  </root>
+</configuration>
+`
 
 type LoggerFactory struct {
 	Appender map[string]LogAppender
 	Root     *LoggerConfig
 	RefMap   map[string]*LoggerConfig
+	initLock sync.Once
+}
+
+func (l *LoggerFactory) init() {
+	l.initLock.Do(func() {
+		l.RefMap = make(map[string]*LoggerConfig)
+		l.Appender = make(map[string]LogAppender)
+		l.Parse(defaultLogback, nil)
+	})
 }
 
 func (l *LoggerFactory) GetLoggerType(p reflect.Type) application.AppLoger {
+	l.init()
 	name := util.ClassUtil.GetClassNameByTypeV1(p)
 	return l.GetLoggerString(name)
 }
 
 func (l *LoggerFactory) GetLoggerString(name string) application.AppLoger {
+	l.init()
 	var node *LoggerConfig
 	if config, ok := l.RefMap[name]; ok {
 		node = config
@@ -54,6 +81,7 @@ func (l *LoggerFactory) GetLoggerString(name string) application.AppLoger {
 }
 
 func (l *LoggerFactory) innerPrintTree(node *LoggerConfig, depth int) {
+	l.init()
 	m := make([]string, depth, depth)
 	for i := 0; i < depth; i++ {
 		m[i] = "-"
@@ -67,6 +95,7 @@ func (l *LoggerFactory) innerPrintTree(node *LoggerConfig, depth int) {
 	}
 }
 func (l *LoggerFactory) PrintTree() {
+	l.init()
 	fmt.Println(l.Root.Level, len(l.Root.Appender))
 	for _, c := range l.Root.Children {
 		l.innerPrintTree(c, 0)
@@ -74,6 +103,7 @@ func (l *LoggerFactory) PrintTree() {
 }
 
 func (l *LoggerFactory) Cover2Logger(ele *LogLoggerXmlEle) *LoggerConfig {
+	l.init()
 	config := &LoggerConfig{
 		Name:        ele.Name,
 		Level:       ele.Level,
@@ -93,6 +123,7 @@ func (l *LoggerFactory) Cover2Logger(ele *LogLoggerXmlEle) *LoggerConfig {
 }
 
 func (l *LoggerFactory) AddLevelNode(node *LoggerConfig) {
+	l.init()
 	if node.Name == "" {
 		return
 	}
@@ -106,6 +137,11 @@ func (l *LoggerFactory) AddLevelNode(node *LoggerConfig) {
 		key := keys[i]
 		if children, ok := current.ChildrenMap[key]; ok {
 			if i == (lsize - 1) {
+
+				if node.Level != "" && node.Extended == 1 {
+					node.Extended = 0
+				}
+
 				children.Level = node.Level
 				children.Additivity = node.Additivity
 				children.Appender = node.Appender
@@ -134,8 +170,47 @@ func (l *LoggerFactory) AddLevelNode(node *LoggerConfig) {
 		}
 	}
 }
-func (l *LoggerFactory) Parse(content string, funcMap template.FuncMap) {
 
+func (l *LoggerFactory) ParseAndReload(content string, funcMap template.FuncMap) {
+	l.init()
+	l.Parse(content, funcMap)
+	l.ReloadLevel()
+}
+
+// ReloadLevel 重建level等级 有些level是继承的
+func (l *LoggerFactory) ReloadLevel() {
+	if l.Root == nil {
+		return
+	}
+	for _, v := range l.Root.ChildrenMap {
+		l.reloadLeveling(v)
+	}
+}
+
+func (l *LoggerFactory) reloadLeveling(node *LoggerConfig) {
+
+	if node.Level != "" && node.Extended == 1 {
+		current := node.Parent
+		for current != nil {
+			if current.Level != "" {
+				break
+			}
+			current = current.Parent
+		}
+		node.Level = current.Level
+	}
+
+	if len(node.ChildrenMap) == 0 {
+		return
+	}
+	for _, v := range node.ChildrenMap {
+		l.reloadLeveling(v)
+	}
+
+}
+
+func (l *LoggerFactory) Parse(content string, funcMap template.FuncMap) {
+	l.init()
 	var tpl *template.Template
 	if funcMap == nil || len(funcMap) == 0 {
 		tpl = template.Must(template.New(fmt.Sprintf("%s-%s-logcore", util.DateUtil.FormatNowByType(util.DatePattern2), util.StringUtil.GetRandomStr(5))).Parse(content))

@@ -74,3 +74,8 @@
 1. yaml配置变更，触发注入的配置实例变更
 2. rollingfile appender
 3. 引入接口注入(完成)
+
+
+### 整改
+1. logfactory 使用默认配置
+2. logfactory 动态刷新配置
