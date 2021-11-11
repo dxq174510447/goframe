@@ -1,34 +1,6 @@
-package application
+package http
 
-const (
-	AnnotationRestController = "AnnotationRestController_"
-
-	AnnotationController = "AnnotationController_"
-
-	AnnotationValueRestKey = "AnnotationValueRestKey_"
-
-	FilterIndexWaitToExecute = "FilterIndexWaitToExecute_"
-
-	CurrentControllerInvoker = "CurrentControllerInvoker_"
-
-	CurrentHttpRequest = "CurrentHttpRequest_"
-
-	CurrentHttpResponse = "CurrentHttpResponse_"
-
-	RestControllerAnnotationName = "RestController"
-
-	RequestMappingAnnotationName = "RequestMapping"
-
-	RequestParamAnnotationName = "RequestParam"
-
-	RequestBodyAnnotationName = "RequestBody"
-
-	CookieValueAnnotationName = "CookieValue"
-
-	PathVariableAnnotationName = "PathVariable"
-
-	RequestHeaderAnnotationName = "RequestHeader"
-)
+import "github.com/dxq174510447/goframe/lib/frame/application"
 
 type RestControllerAnnotation struct {
 	Value string
@@ -45,7 +17,7 @@ func (c *RestControllerAnnotationSpi) AnnotationName() string {
 	return RestControllerAnnotationName
 }
 
-func (c *RestControllerAnnotationSpi) NewAnnotation() Annotation {
+func (c *RestControllerAnnotationSpi) NewAnnotation() application.Annotation {
 	return &RestControllerAnnotation{}
 }
 
@@ -65,7 +37,7 @@ func (c *RequestMappingAnnotationSpi) AnnotationName() string {
 	return RequestMappingAnnotationName
 }
 
-func (c *RequestMappingAnnotationSpi) NewAnnotation() Annotation {
+func (c *RequestMappingAnnotationSpi) NewAnnotation() application.Annotation {
 	return &RequestMappingAnnotation{}
 }
 
@@ -85,7 +57,7 @@ func (r *RequestParamAnnotationSpi) AnnotationName() string {
 	return RequestParamAnnotationName
 }
 
-func (r *RequestParamAnnotationSpi) NewAnnotation() Annotation {
+func (r *RequestParamAnnotationSpi) NewAnnotation() application.Annotation {
 	return &RequestParamAnnotation{}
 }
 
@@ -105,7 +77,7 @@ func (r *RequestHeaderAnnotationSpi) AnnotationName() string {
 	return RequestHeaderAnnotationName
 }
 
-func (r *RequestHeaderAnnotationSpi) NewAnnotation() Annotation {
+func (r *RequestHeaderAnnotationSpi) NewAnnotation() application.Annotation {
 	return &RequestHeaderAnnotation{}
 }
 
@@ -125,7 +97,7 @@ func (r *CookieValueAnnotationSpi) AnnotationName() string {
 	return CookieValueAnnotationName
 }
 
-func (r *CookieValueAnnotationSpi) NewAnnotation() Annotation {
+func (r *CookieValueAnnotationSpi) NewAnnotation() application.Annotation {
 	return &CookieValueAnnotation{}
 }
 
@@ -143,7 +115,7 @@ func (r *RequestBodyAnnotationSpi) AnnotationName() string {
 	return RequestBodyAnnotationName
 }
 
-func (r *RequestBodyAnnotationSpi) NewAnnotation() Annotation {
+func (r *RequestBodyAnnotationSpi) NewAnnotation() application.Annotation {
 	return &RequestBodyAnnotation{}
 }
 
@@ -162,36 +134,36 @@ func (r *PathVariableAnnotationSpi) AnnotationName() string {
 	return PathVariableAnnotationName
 }
 
-func (r *PathVariableAnnotationSpi) NewAnnotation() Annotation {
+func (r *PathVariableAnnotationSpi) NewAnnotation() application.Annotation {
 	return &PathVariableAnnotation{}
 }
 
 func init() {
 	rc := &RestControllerAnnotationSpi{}
-	_ = AnnotationSpi(rc)
-	GetResourcePool().RegisterInstance("", rc)
+	_ = application.AnnotationSpi(rc)
+	application.GetResourcePool().RegisterInstance("", rc)
 
 	rm := &RequestMappingAnnotationSpi{}
-	_ = AnnotationSpi(rm)
-	GetResourcePool().RegisterInstance("", rm)
+	_ = application.AnnotationSpi(rm)
+	application.GetResourcePool().RegisterInstance("", rm)
 
 	rr := &RequestParamAnnotationSpi{}
-	_ = AnnotationSpi(rr)
-	GetResourcePool().RegisterInstance("", rr)
+	_ = application.AnnotationSpi(rr)
+	application.GetResourcePool().RegisterInstance("", rr)
 
 	rb := &RequestBodyAnnotationSpi{}
-	_ = AnnotationSpi(rb)
-	GetResourcePool().RegisterInstance("", rb)
+	_ = application.AnnotationSpi(rb)
+	application.GetResourcePool().RegisterInstance("", rb)
 
 	cv := &CookieValueAnnotationSpi{}
-	_ = AnnotationSpi(cv)
-	GetResourcePool().RegisterInstance("", cv)
+	_ = application.AnnotationSpi(cv)
+	application.GetResourcePool().RegisterInstance("", cv)
 
 	pv := &PathVariableAnnotationSpi{}
-	_ = AnnotationSpi(pv)
-	GetResourcePool().RegisterInstance("", pv)
+	_ = application.AnnotationSpi(pv)
+	application.GetResourcePool().RegisterInstance("", pv)
 
 	rh := &RequestHeaderAnnotationSpi{}
-	_ = AnnotationSpi(rh)
-	GetResourcePool().RegisterInstance("", rh)
+	_ = application.AnnotationSpi(rh)
+	application.GetResourcePool().RegisterInstance("", rh)
 }

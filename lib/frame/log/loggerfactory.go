@@ -43,13 +43,15 @@ func (l *LoggerFactory) init() {
 }
 
 func (l *LoggerFactory) GetLoggerType(p reflect.Type) application.AppLoger {
-	l.init()
 	name := util.ClassUtil.GetClassNameByTypeV1(p)
 	return l.GetLoggerString(name)
 }
 
+func (l *LoggerFactory) LogTypeName() string {
+	return PlatLogKey
+}
+
 func (l *LoggerFactory) GetLoggerString(name string) application.AppLoger {
-	l.init()
 	var node *LoggerConfig
 	if config, ok := l.RefMap[name]; ok {
 		node = config
@@ -81,7 +83,6 @@ func (l *LoggerFactory) GetLoggerString(name string) application.AppLoger {
 }
 
 func (l *LoggerFactory) innerPrintTree(node *LoggerConfig, depth int) {
-	l.init()
 	m := make([]string, depth, depth)
 	for i := 0; i < depth; i++ {
 		m[i] = "-"
@@ -95,7 +96,6 @@ func (l *LoggerFactory) innerPrintTree(node *LoggerConfig, depth int) {
 	}
 }
 func (l *LoggerFactory) PrintTree() {
-	l.init()
 	fmt.Println(l.Root.Level, len(l.Root.Appender))
 	for _, c := range l.Root.Children {
 		l.innerPrintTree(c, 0)
@@ -103,7 +103,6 @@ func (l *LoggerFactory) PrintTree() {
 }
 
 func (l *LoggerFactory) Cover2Logger(ele *LogLoggerXmlEle) *LoggerConfig {
-	l.init()
 	config := &LoggerConfig{
 		Name:        ele.Name,
 		Level:       ele.Level,
@@ -123,7 +122,6 @@ func (l *LoggerFactory) Cover2Logger(ele *LogLoggerXmlEle) *LoggerConfig {
 }
 
 func (l *LoggerFactory) AddLevelNode(node *LoggerConfig) {
-	l.init()
 	if node.Name == "" {
 		return
 	}
@@ -172,7 +170,6 @@ func (l *LoggerFactory) AddLevelNode(node *LoggerConfig) {
 }
 
 func (l *LoggerFactory) ParseAndReload(content string, funcMap template.FuncMap) {
-	l.init()
 	l.Parse(content, funcMap)
 	l.ReloadLevel()
 }
@@ -210,7 +207,6 @@ func (l *LoggerFactory) reloadLeveling(node *LoggerConfig) {
 }
 
 func (l *LoggerFactory) Parse(content string, funcMap template.FuncMap) {
-	l.init()
 	var tpl *template.Template
 	if funcMap == nil || len(funcMap) == 0 {
 		tpl = template.Must(template.New(fmt.Sprintf("%s-%s-logcore", util.DateUtil.FormatNowByType(util.DatePattern2), util.StringUtil.GetRandomStr(5))).Parse(content))
@@ -290,9 +286,11 @@ func (l *LoggerFactory) Parse(content string, funcMap template.FuncMap) {
 var loggerFactory LoggerFactory = LoggerFactory{}
 
 func GetLoggerFactory() *LoggerFactory {
+	loggerFactory.init()
 	return &loggerFactory
 }
 
 func init() {
+	loggerFactory.init()
 	application.GetResourcePool().RegisterLogFactory(application.AppLogFactoryer(&loggerFactory))
 }

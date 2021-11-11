@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/dxq174510447/goframe/lib/frame/util"
 	"reflect"
+	"text/template"
 )
 
 //ApplicationContext 应用上下文
@@ -29,6 +30,10 @@ type ApplicationContext struct {
 	ClassInfoMap map[string]*ClassV1
 
 	logger AppLoger
+}
+
+func (a *ApplicationContext) GetFuncMap() template.FuncMap {
+	return a.AppConfig.GetTplFuncMap()
 }
 
 func (a *ApplicationContext) addClassInfo(className string, info *ClassV1) {

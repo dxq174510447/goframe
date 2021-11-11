@@ -12,6 +12,8 @@ import (
 )
 
 const (
+	PlatLogKey = "PlatLogKey_"
+
 	LogAppenderAdapterGroup = "LogAppenderAdapterGroup_"
 
 	ConsoleAppenderAdapterKey     = "console"

@@ -10,24 +10,13 @@ import (
 type ResourcePool struct {
 	// 配置文件
 	ConfigMap map[string]string
-	// 日志配置文件
-	//LogConfigMap map[string]string
+
+	// 日志配置
+	LogConfigMap map[string][]string
 	// 实例池
 	ProxyInsPool *DynamicProxyLinkedArray
 
 	ClassInfoList []string
-}
-
-// RegisterInterfaceType 接口类型 可以见RegisterInterfaceType(ApplicationContextListenerType)
-// 后面可以通过applicationContext.GetProxyInsByInterfaceType 获取
-// 因为go不能通过struct反推出它所包含的接口,所以先把所有接口注入到容器，在注入struct的时候和接口一个个比较
-func (r *ResourcePool) RegisterInterfaceType(t reflect.Type) {
-	r.ProxyInsPool.AddInterfacer(t)
-}
-
-// RegisterSysInterfaceType 给框架使用的
-func (r *ResourcePool) RegisterSysInterfaceType(t reflect.Type) {
-	r.ProxyInsPool.AddSysInterfacer(t)
 }
 
 // AddConfigYaml 初始化添加全局配置文件内容
@@ -37,8 +26,28 @@ func (r *ResourcePool) AddConfigYaml(name string, config string) {
 	resourcePool.ConfigMap[name] = config
 }
 
+func (r *ResourcePool) AddLogConfig(logType string, config string) {
+	if list, ok := r.LogConfigMap[logType]; ok {
+		r.LogConfigMap[logType] = append(list, config)
+	} else {
+		r.LogConfigMap[logType] = []string{config}
+	}
+}
+
 func (r *ResourcePool) AddClassInfo(info string) {
 	resourcePool.ClassInfoList = append(resourcePool.ClassInfoList, info)
+}
+
+// RegisterSysInterfaceType 给框架使用的
+func (r *ResourcePool) RegisterSysInterfaceType(t reflect.Type) {
+	r.ProxyInsPool.AddSysInterfacer(t)
+}
+
+// RegisterInterfaceType 接口类型 可以见RegisterInterfaceType(ApplicationContextListenerType)
+// 后面可以通过applicationContext.GetProxyInsByInterfaceType 获取
+// 因为go不能通过struct反推出它所包含的接口,所以先把所有接口注入到容器，在注入struct的时候和接口一个个比较
+func (r *ResourcePool) RegisterInterfaceType(t reflect.Type) {
+	r.ProxyInsPool.AddInterfacer(t)
 }
 
 func (r *ResourcePool) RegisterLogFactory(logfactory AppLogFactoryer) {
@@ -47,7 +56,7 @@ func (r *ResourcePool) RegisterLogFactory(logfactory AppLogFactoryer) {
 
 // AddInstance name 可以为空 ，默认会设置类名 将实例放到容器中
 // instance 必须是指针
-func (r *ResourcePool) RegisterInstance(name string, instance interface{}) {
+func (r *ResourcePool) RegisterInstance(name string, instance interface{}, superInterfaces ...reflect.Type) {
 
 	if reflect.TypeOf(instance).Kind() != reflect.Ptr {
 		err := fmt.Errorf("%s is not ptr", name)
@@ -61,26 +70,32 @@ func (r *ResourcePool) RegisterInstance(name string, instance interface{}) {
 	}
 
 	node := &DynamicProxyInstanceNode{
-		Target: instance,
-		Id:     key,
+		Target:          instance,
+		Id:              key,
+		SuperInterfaces: superInterfaces,
 	}
-
-	resourcePool.ProxyInsPool.Push(node)
 
 	// 检查是不是实现了特别的接口 如果是的话 就放到解析头部
 	var hasAdd bool = false
-	t := reflect.TypeOf(instance)
-	for k, v := range resourcePool.ProxyInsPool.SysInterfaceTypeNameMap {
-		if t.Implements(v) {
-			if as, ok := resourcePool.ProxyInsPool.SysInterfaceImplNameMap[k]; ok {
-				resourcePool.ProxyInsPool.SysInterfaceImplNameMap[k] = append(as, node)
-			} else {
-				resourcePool.ProxyInsPool.SysInterfaceImplNameMap[k] = []*DynamicProxyInstanceNode{node}
-			}
 
-			if !hasAdd {
-				resourcePool.ProxyInsPool.AddHead(node)
-				hasAdd = true
+	if len(superInterfaces) > 0 {
+
+		for _, interfaceType := range superInterfaces {
+
+			resourcePool.ProxyInsPool.AddInterfacer(interfaceType)
+
+			interfaceTypeName := util.ClassUtil.GetClassNameByTypeV1(interfaceType)
+			if _, ok := resourcePool.ProxyInsPool.SysInterfaceTypeNameMap[interfaceTypeName]; ok {
+				if as, ok := resourcePool.ProxyInsPool.SysInterfaceImplNameMap[interfaceTypeName]; ok {
+					resourcePool.ProxyInsPool.SysInterfaceImplNameMap[interfaceTypeName] = append(as, node)
+				} else {
+					resourcePool.ProxyInsPool.SysInterfaceImplNameMap[interfaceTypeName] = []*DynamicProxyInstanceNode{node}
+				}
+
+				if !hasAdd {
+					resourcePool.ProxyInsPool.AddHead(node)
+					hasAdd = true
+				}
 			}
 		}
 	}
@@ -92,6 +107,7 @@ func (r *ResourcePool) RegisterInstance(name string, instance interface{}) {
 
 var resourcePool ResourcePool = ResourcePool{
 	ConfigMap:     make(map[string]string),
+	LogConfigMap:  make(map[string][]string),
 	ProxyInsPool:  &DynamicProxyLinkedArray{},
 	ClassInfoList: make([]string, 0, 0),
 }

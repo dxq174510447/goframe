@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"text/template"
 )
 
 type HttpStarter interface {
@@ -256,6 +257,9 @@ type DynamicProxyInstanceNode struct {
 
 	// 节点id 如果不指定到话  see util.ClassUtil.GetSimpleClassName
 	Id string
+
+	// 实现的接口
+	SuperInterfaces []reflect.Type
 
 	// Target 类型 push的时候设置  里面的值都是指针
 	rt reflect.Type
@@ -521,6 +525,10 @@ type AppLogFactoryer interface {
 	GetLoggerType(p reflect.Type) AppLoger
 
 	GetLoggerString(className string) AppLoger
+
+	LogTypeName() string
+
+	ParseAndReload(config string, funcMap template.FuncMap)
 }
 
 type Annotation interface {

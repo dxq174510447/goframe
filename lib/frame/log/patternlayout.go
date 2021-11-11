@@ -39,7 +39,7 @@ func (p *PatternLayout) DoLayout(local context.Context, level string, config *Lo
 			msg.FileName = "???"
 			msg.Line = "0"
 		} else {
-			msg.FileName = util.ClassUtil.GetJavaFileNameByType(file2)
+			msg.FileName = file2
 			msg.Line = strconv.Itoa(line)
 		}
 	}

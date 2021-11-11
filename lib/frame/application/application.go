@@ -12,7 +12,7 @@ import (
 )
 
 type Application struct {
-	// 启动类
+	// 启动类 可空
 	MainClass interface{}
 
 	// 应用上下文加载监听器
@@ -83,6 +83,8 @@ func (a *Application) Run(args []string) *ApplicationContext {
 	a.LoadClassInfo(local, applicationContext)
 
 	a.RefreshContext(local, applicationContext)
+
+	a.RefreshLog(local, applicationContext)
 
 	listeners.Running(local, applicationContext)
 
@@ -220,6 +222,18 @@ func (a *Application) beanInject(local context.Context, applicationContext *Appl
 	return allInject, nil
 }
 
+func (a *Application) RefreshLog(local context.Context, applicationContext *ApplicationContext) {
+	name := a.FrameResource.ProxyInsPool.LogFactory.LogTypeName()
+	for key, rows := range a.FrameResource.LogConfigMap {
+		if name == key {
+			for _, config := range rows {
+				// funcMap template.FuncMap
+				a.FrameResource.ProxyInsPool.LogFactory.ParseAndReload(config, applicationContext.GetFuncMap())
+			}
+		}
+	}
+}
+
 // RefreshContext 加载实例
 func (a *Application) RefreshContext(local context.Context, applicationContext *ApplicationContext) {
 
@@ -241,10 +255,13 @@ func (a *Application) RefreshContext(local context.Context, applicationContext *
 
 		// 放入到应用上下文中
 		applicationContext.addInstance(current)
-		for _, interType := range insPool.InterfaceTypeNameMap {
-			if current.rt.Implements(interType) {
-				applicationContext.addInterfaceImpl(interType, current)
-			}
+		//for _, interType := range insPool.InterfaceTypeNameMap {
+		//	if current.rt.Implements(interType) {
+		//		applicationContext.addInterfaceImpl(interType, current)
+		//	}
+		//}
+		for _, superType := range current.SuperInterfaces {
+			applicationContext.addInterfaceImpl(superType, current)
 		}
 
 		inject, err := a.beanInject(local, applicationContext, current, false, true)
