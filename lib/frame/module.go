@@ -1,10 +1,10 @@
 package frame
 
 import (
-	_ "github.com/dxq174510447/goframe/lib/frame/application"
-	//_ "github.com/dxq174510447/goframe/lib/frame/db"
-	_ "github.com/dxq174510447/goframe/lib/frame/event"
-	_ "github.com/dxq174510447/goframe/lib/frame/http"
-	_ "github.com/dxq174510447/goframe/lib/frame/log"
-	//_ "github.com/dxq174510447/goframe/lib/frame/proxy"
+	_ "goframe/lib/frame/application"
+	//_ "goframe/lib/frame/db"
+	_ "goframe/lib/frame/event"
+	_ "goframe/lib/frame/http"
+	_ "goframe/lib/frame/log"
+	//_ "goframe/lib/frame/proxy"
 )

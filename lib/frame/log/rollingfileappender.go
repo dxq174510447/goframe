@@ -3,7 +3,7 @@ package log
 import (
 	"bufio"
 	"context"
-	"github.com/dxq174510447/goframe/lib/frame/util"
+	"goframe/lib/frame/util"
 	"io"
 	"os"
 	"time"

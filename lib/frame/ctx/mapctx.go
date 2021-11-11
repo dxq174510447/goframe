@@ -3,7 +3,7 @@ package ctx
 import (
 	"context"
 	"fmt"
-	"github.com/dxq174510447/goframe/lib/frame/structure"
+	"goframe/lib/frame/structure"
 )
 
 type StackCtx struct {

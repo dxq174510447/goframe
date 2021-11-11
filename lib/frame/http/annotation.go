@@ -1,6 +1,6 @@
 package http
 
-import "github.com/dxq174510447/goframe/lib/frame/application"
+import "goframe/lib/frame/application"
 
 type RestControllerAnnotation struct {
 	Value string

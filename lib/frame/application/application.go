@@ -3,8 +3,8 @@ package application
 import (
 	"context"
 	"fmt"
-	"github.com/dxq174510447/goframe/lib/frame/ctx"
-	"github.com/dxq174510447/goframe/lib/frame/util"
+	"goframe/lib/frame/ctx"
+	"goframe/lib/frame/util"
 	"gopkg.in/yaml.v3"
 	"reflect"
 	"sort"

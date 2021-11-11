@@ -2,7 +2,7 @@ package event
 
 import (
 	"context"
-	"github.com/dxq174510447/goframe/lib/frame/application"
+	"goframe/lib/frame/application"
 )
 
 type FrameListenerLoadStrategy struct {

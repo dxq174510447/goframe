@@ -2,8 +2,8 @@ package event
 
 import (
 	"context"
-	"github.com/dxq174510447/goframe/lib/frame/application"
-	"github.com/dxq174510447/goframe/lib/frame/util"
+	"goframe/lib/frame/application"
+	"goframe/lib/frame/util"
 	"reflect"
 	"sort"
 )

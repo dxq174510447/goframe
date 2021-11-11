@@ -2,7 +2,7 @@ package http
 
 import (
 	"fmt"
-	"github.com/dxq174510447/goframe/lib/frame/application"
+	"goframe/lib/frame/application"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"testing"
